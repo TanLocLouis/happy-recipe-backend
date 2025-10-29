@@ -1,0 +1,4 @@
+- Cannot redirect after Signup.
+- Not alert user when password is too short or invalid email.
+- Change admin to admin@happy-recipe.com
+- Change 123 to 12345678
