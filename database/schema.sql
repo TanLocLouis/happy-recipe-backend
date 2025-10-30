@@ -21,7 +21,7 @@ INSERT IGNORE INTO roles (id, name, description) VALUES
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id CHAR(36) PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Create chef requests table
 CREATE TABLE IF NOT EXISTS chef_requests (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
+    user_id CHAR(36) NOT NULL,
     experience_years INT NOT NULL,
     specialties TEXT NOT NULL,
     motivation TEXT NOT NULL,
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS chef_requests (
 -- Create posts table (for admin to delete posts)
 CREATE TABLE IF NOT EXISTS posts (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
+    user_id CHAR(36) NOT NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
     image_url VARCHAR(500),
