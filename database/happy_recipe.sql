@@ -6,7 +6,7 @@ USE happy_recipe;
 
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
-    user_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id CHAR(36) PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -26,7 +26,7 @@ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- Posts Table
 CREATE TABLE IF NOT EXISTS posts (
     post_id CHAR(8) PRIMARY KEY,
-    user_id BIGINT NOT NULL,
+    user_id CHAR(36) NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     cook_time INT, -- in minutes
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS posts (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     is_deleted BOOLEAN DEFAULT FALSE,
     deleted_at TIMESTAMP NULL,
-    deleted_by BIGINT NULL, -- moderator/admin who deleted
+    deleted_by CHAR(36) NULL, -- moderator/admin who deleted
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
     INDEX idx_created_at (created_at),
@@ -88,7 +88,7 @@ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS reactions (
     reaction_id BIGINT PRIMARY KEY AUTO_INCREMENT,
     post_id CHAR(8) NOT NULL,
-    user_id BIGINT NOT NULL,
+    user_id CHAR(36) NOT NULL,
     reaction_type ENUM('like', 'heart', 'yum') DEFAULT 'like',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY unique_user_post_reaction (user_id, post_id),
@@ -103,7 +103,7 @@ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS comments (
     comment_id BIGINT PRIMARY KEY AUTO_INCREMENT,
     post_id CHAR(8) NOT NULL,
-    user_id BIGINT NOT NULL,
+    user_id CHAR(36) NOT NULL,
     comment_text TEXT NOT NULL,
     parent_comment_id BIGINT NULL, -- for nested replies
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -121,7 +121,7 @@ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- Favorites Table (saved recipes)
 CREATE TABLE IF NOT EXISTS favorites (
     favorite_id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
+    user_id CHAR(36) NOT NULL,
     post_id CHAR(8) NOT NULL,
     -- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY unique_user_post_favorite (user_id, post_id),
@@ -166,7 +166,7 @@ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- User Mod Table
 CREATE TABLE IF NOT EXISTS user_moderation (
     action_id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
+    user_id CHAR(36) NOT NULL,
     moderator_id BIGINT NULL, --
     admin_id BIGINT NULL, --
     action_type ENUM('warning', 'ban') NOT NULL,

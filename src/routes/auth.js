@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { signup, login } from '../controllers/authController.js';
+import { signup, login, validate2FA } from '../controllers/authController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 
 const router = Router();
@@ -32,6 +32,15 @@ router.post(
   validateRequest,
   login
 );
+
+router.post(
+  '/validate/2fa', 
+  [
+    // body('tempToken').isString().isLength({ min: 10 }),
+  ],
+  validateRequest,
+  validate2FA
+)
 
 export default router;
 
