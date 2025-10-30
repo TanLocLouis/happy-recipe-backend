@@ -23,6 +23,17 @@ CREATE TABLE IF NOT EXISTS users (
 )
 ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 2FA Table
+CREATE TABLE IF NOT EXISTS `2fa` (
+    user_id CHAR(36) NOT NULL,
+    temp_token VARCHAR(255) NOT NULL,
+    code VARCHAR(20) NOT NULL,
+    expires_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    INDEX idx_2fa_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Posts Table
 CREATE TABLE IF NOT EXISTS posts (
     post_id CHAR(8) PRIMARY KEY,

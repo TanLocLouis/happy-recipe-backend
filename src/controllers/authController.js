@@ -1,8 +1,8 @@
 import { pool } from '../config/db.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
-import { signToken } from '../utils/jwt.js';
+import { signToken, verifyToken } from '../utils/jwt.js';
 import { randomUUID } from 'crypto';
-import nodemailer from 'nodemailer';
+import { sendMail } from '../services/mailer.js';
 
 export async function signup(req, res) {
   const { firstName, lastName, email, password } = req.body;
@@ -46,105 +46,7 @@ export async function signup(req, res) {
   }
 }
 
-function generateVerificationEmail(email, token) { 
-    return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                line-height: 1.6;
-                background-color: #f9f9f9;
-                color: #333;
-            }
-            .email-container {
-                max-width: 600px;
-                margin: 20px auto;
-                background: #fff;
-                padding: 20px;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            }
-            .email-header {
-                font-size: 20px;
-                font-weight: bold;
-                text-align: center;
-                color: #0056b3;
-                margin-bottom: 20px;
-            }
-            .email-body {
-                font-size: 16px;
-            }
-            .email-link {
-                display: inline-block;
-                margin: 20px 0;
-                padding: 10px 20px;
-                background-color: #007bff;
-                color: #fff;
-                text-decoration: none;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            .email-link:hover {
-                background-color: #0056b3;
-            }
-            .email-footer {
-                font-size: 12px;
-                text-align: center;
-                color: #999;
-                marginTop: 20px;
-            }
-        </style>
-        </head>
-        <body>
-        <div className="email-container">
-            <div className="email-header">
-                Verify Your New Account
-            </div>
-            <div className="email-body">
-                <p>Welcome! Please use the code below to verify your account:</p>
-                <a className="email-link">
-                    ${token}
-                </a>
-            </div>
-            <div className="email-footer">
-                <p>If you didn’t request this email, you can safely ignore it.</p>
-            </div>
-        </div>
-        </body>
-        </html>
-    `
-};
-
-// Send verify email to new user
-export function sendMail(email, code) {
-    // console.log("Sending email to: ", email, " with code: ", code);
-  if (!process.env.VITE_MAIL || !process.env.VITE_MAILTOKEN) {
-    console.warn('[WARN] Mail credentials not set (VITE_MAIL / VITE_MAILTOKEN). Email sending will likely fail.');
-  }
-
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.VITE_MAIL,
-      pass: process.env.VITE_MAILTOKEN
-    }
-  })
-
-    const email_content = generateVerificationEmail(email, code); 
-  const mailOptions = {
-    from: process.env.VITE_MAIL,
-    to: email,
-    subject: 'ACCOUNT CONFIRMATION',
-    html: email_content
-  }
-    transporter.sendMail(mailOptions, (err, info) => {
-        if (err) console.log('[ERROR] MAIL SENDER: ', err)
-        else console.log('[INFO] MAIL SENDER: ', info.response)
-    })
-}
+// Mail sending has been extracted to `src/services/mailer.js`.
 
 
 export async function login(req, res) {
@@ -173,12 +75,32 @@ export async function login(req, res) {
     await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = ?', [user.user_id]);
 
     const userId = user.user_id;
-    const tempToken = signToken({ userId });
+  const tempToken = signToken({ userId });
 
     // Generate code and tempToken
     // Insert code and tempToken into database with expiration
     const code = Math.floor(1000000 + Math.random() * 8999999).toString();
-    sendMail(user.email, code);
+
+    // Check if a 2FA code already exists for this user
+    const [result] = await pool.query(
+      'SELECT * FROM 2fa WHERE user_id = ?',
+      [userId]
+    );
+    if (result.length > 0) {
+      // If 2fa code expired, delete it
+      if (new Date(result[0].expires_at) < new Date()) {
+        await pool.query(
+          'DELETE FROM 2fa WHERE user_id = ?',
+          [userId]
+        );
+      } else {
+        // If not expired, inform user to check email
+        return res.status(200).json({ message: '2FA code already sent. Please check your email.' });
+      }
+    }
+
+    // Send email with code
+    await sendMail(user.email, code);
     await pool.query(
       'INSERT INTO 2fa (user_id, code, temp_token, expires_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 1 MINUTE))',
       [userId, code, tempToken]
@@ -189,6 +111,37 @@ export async function login(req, res) {
     });
   } catch (err) {
     console.log(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// Exchange a refresh token for a new access token
+export async function requestNewAccessToken(req, res) {
+  try {
+    const refreshToken = req.body.refreshToken || req.headers['authorization']?.split(' ')[1];
+    if (!refreshToken) return res.status(400).json({ message: 'Missing refresh token' });
+
+    let payload;
+    try {
+      payload = verifyToken(refreshToken);
+    } catch (err) {
+      return res.status(401).json({ message: 'Invalid or expired refresh token' });
+    }
+
+    // Ensure this is a refresh token if your tokens include a type field
+    if (payload.type && payload.type !== 'refresh') {
+      return res.status(400).json({ message: 'Provided token is not a refresh token' });
+    }
+
+    const userId = payload.userId || payload.user_id;
+    if (!userId) return res.status(400).json({ message: 'Invalid token payload' });
+
+    // Issue a new access token (short-lived)
+    const accessToken = signToken({ userId, username: payload.username }, '15m');
+
+    return res.status(200).json({ accessToken });
+  } catch (err) {
+    console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
   }
 }

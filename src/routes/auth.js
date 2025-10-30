@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { signup, login, validate2FA } from '../controllers/authController.js';
+import { signup, login, validate2FA, requestNewAccessToken } from '../controllers/authController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 
 const router = Router();
@@ -41,6 +41,15 @@ router.post(
   validateRequest,
   validate2FA
 )
+
+router.post(
+  '/token',
+  [
+    body('refreshToken').optional().isString()
+  ],
+  validateRequest,
+  requestNewAccessToken
+);
 
 export default router;
 
