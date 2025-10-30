@@ -78,5 +78,16 @@ CREATE TABLE IF NOT EXISTS posts (
     INDEX idx_created_at (created_at)
 );
 
+-- 2FA Table
+CREATE TABLE IF NOT EXISTS `2fa` (
+    user_id CHAR(36) NOT NULL,
+    temp_token VARCHAR(255) NOT NULL,
+    code VARCHAR(20) NOT NULL,
+    expires_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_2fa_expires_at (expires_at)
+);
+
 -- Show tables
 SHOW TABLES;
