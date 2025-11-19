@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { signup, login, validate2FA, requestNewAccessToken } from '../controllers/authController.js';
+import { signup, login, validate2FA, requestNewAccessToken, getUserInfo } from '../controllers/authController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 
 const router = Router();
@@ -49,6 +49,16 @@ router.post(
   ],
   validateRequest,
   requestNewAccessToken
+);
+
+router.post(
+  '/userinfo',
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('password').isString().isLength({ min: 8 })
+  ],
+  validateRequest,
+  getUserInfo
 );
 
 export default router;

@@ -75,7 +75,7 @@ export async function login(req, res) {
     await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = ?', [user.user_id]);
 
     const userId = user.user_id;
-  const tempToken = signToken({ userId });
+    const tempToken = signToken({ userId });
 
     // Generate code and tempToken
     // Insert code and tempToken into database with expiration
@@ -140,6 +140,42 @@ export async function requestNewAccessToken(req, res) {
     const accessToken = signToken({ userId, username: payload.username }, '15m');
 
     return res.status(200).json({ accessToken });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+export async function getUserInfo(req, res) {
+  const { email, password } = req.body;
+  try {
+    const [rows] = await pool.query(
+      'SELECT user_id, username, display_name, email, password_hash, is_active FROM users WHERE (email = ?) LIMIT 1',
+      [email]
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const user = rows[0];
+    if (!user.is_active) {
+      return res.status(403).json({ message: 'Account is disabled' });
+    }
+
+    const valid = await verifyPassword(password, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const userInfo = {
+      user_id: user.user_id,
+      username: user.username || null,
+      display_name: user.display_name || null,
+      email: user.email
+    };
+
+    return res.status(200).json(userInfo);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
