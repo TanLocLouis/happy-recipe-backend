@@ -24,7 +24,7 @@ router.post('/test', (req, res) => {
 })
 
 router.post(
-  '/login',
+  '/signin',
   [
     body('email').isString().isLength({ min: 3 }).trim(),
     body('password').isString().isLength({ min: 8 })
@@ -52,7 +52,7 @@ router.post(
 );
 
 router.post(
-  '/userinfo',
+  '/user-info',
   [
     body('email').isEmail().normalizeEmail(),
     body('password').isString().isLength({ min: 8 })
