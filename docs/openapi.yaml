@@ -222,6 +222,124 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /api/posts:
+    post:
+      tags: [Posts]
+      summary: Create a new post with ingredients and steps
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostRequest'
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  postId:
+                    type: string
+                    example: a1b2c3d4
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags: [Posts]
+      summary: List posts (paginated)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Paginated posts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostSummary'
+
+  /api/posts/latest:
+    get:
+      tags: [Posts]
+      summary: Get latest posts with optional details
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: details
+          schema:
+            type: boolean
+            description: Include ingredients and steps when true
+      responses:
+        '200':
+          description: Latest posts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostDetail'
+
+  /api/posts/{id}:
+    get:
+      tags: [Posts]
+      summary: Get a single post by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Post detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostDetail'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -330,4 +448,92 @@ components:
               location:
                 type: string
                 example: body
+    Ingredient:
+      type: object
+      properties:
+        ingredient_id:
+          type: integer
+        item_order:
+          type: integer
+        ingredient_text:
+          type: string
+
+    Step:
+      type: object
+      properties:
+        step_id:
+          type: integer
+        step_number:
+          type: integer
+        step_description:
+          type: string
+        image_url:
+          type: string
+
+    CreatePostRequest:
+      type: object
+      required: [userId, title]
+      properties:
+        userId:
+          type: string
+          example: d290f1ee-6c54-4b01-90e6-d701748f0851
+        title:
+          type: string
+          example: My Pancakes
+        description:
+          type: string
+        cookTime:
+          type: integer
+        servings:
+          type: integer
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+        coverImageUrl:
+          type: string
+        ingredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ingredient'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/Step'
+
+    PostSummary:
+      type: object
+      properties:
+        post_id:
+          type: string
+        user_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        cook_time:
+          type: integer
+        servings:
+          type: integer
+        difficulty:
+          type: string
+        cover_image_url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    PostDetail:
+      allOf:
+        - $ref: '#/components/schemas/PostSummary'
+        - type: object
+          properties:
+            ingredients:
+              type: array
+              items:
+                $ref: '#/components/schemas/Ingredient'
+            steps:
+              type: array
+              items:
+                $ref: '#/components/schemas/Step'
 

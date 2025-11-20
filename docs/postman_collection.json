@@ -137,6 +137,77 @@
         }
       }
     }
+    ,
+    {
+      "name": "Create Post",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"d290f1ee-6c54-4b01-90e6-d701748f0851\",\n  \"title\": \"My Pancakes\",\n  \"description\": \"Fluffy pancakes\",\n  \"ingredients\": [\n    {\"itemOrder\": 1, \"ingredientText\": \"1 cup flour\"},\n    {\"itemOrder\": 2, \"ingredientText\": \"1 egg\"}\n  ],\n  \"steps\": [\n    {\"stepNumber\": 1, \"stepDescription\": \"Mix ingredients\"},\n    {\"stepNumber\": 2, \"stepDescription\": \"Cook on skillet\"}\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:4000/api/posts",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "4000",
+          "path": ["api", "posts"]
+        }
+      }
+    },
+    {
+      "name": "List Posts",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:4000/api/posts?limit=10&offset=0",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "4000",
+          "path": ["api", "posts"],
+          "query": [
+            { "key": "limit", "value": "10" },
+            { "key": "offset", "value": "0" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Post",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:4000/api/posts/{{postId}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "4000",
+          "path": ["api", "posts", "{{postId}}"]
+        }
+      }
+    },
+    {
+      "name": "Get Latest Posts",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:4000/api/posts/latest?limit=5&details=true",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "4000",
+          "path": ["api", "posts", "latest"],
+          "query": [
+            { "key": "limit", "value": "5" },
+            { "key": "details", "value": "true" }
+          ]
+        }
+      }
+    }
   ],
   "event": []
 }
