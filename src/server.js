@@ -3,6 +3,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import authRoutes from './routes/auth.js';
+import postsRoutes from './routes/posts.js';
 import { testConnection } from './config/db.js';
 
 const app = express();
@@ -21,6 +22,7 @@ app.get('/health', async (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/posts', postsRoutes);
 
 app.use((req, res, next) => {
   res.status(404).json({ message: 'Not found' });
