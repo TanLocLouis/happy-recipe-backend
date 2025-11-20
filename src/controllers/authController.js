@@ -1,68 +1,50 @@
-import { pool } from '../config/db.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { signToken, verifyToken } from '../utils/jwt.js';
 import { randomUUID } from 'crypto';
 import { sendMail } from '../services/mailer.js';
 
+import prisma from '../config/prisma.js';
+
 export async function signup(req, res) {
   const { firstName, lastName, email, password } = req.body;
+  const displayName = ((firstName || '') + (lastName ? ' ' + lastName : '')).trim() || null;
 
-  console.log("Signup endpoint hit");
-  console.log(req.body);
-
-  const displayName = firstName + lastName;
+  if (!email || !password) return res.status(400).json({ message: 'Missing required fields' });
 
   try {
-    const [existingUsers] = await pool.query(
-      'SELECT user_id FROM users WHERE email = ? LIMIT 1',
-      [email]
-    );
+    const existingUser = await prisma.users.findUnique({ where: { email } });
+    if (existingUser) return res.status(409).json({ message: 'Username or email already taken' });
 
-    // Check if email already exists
-    if (existingUsers.length > 0) {
-      return res.status(409).json({ message: 'Username or email already taken' });
-    }
-
-    // Use hash funtion to protect password
     const passwordHash = await hashPassword(password);
-
-    // Generate UUID for user and insert new user into database
     const userId = randomUUID();
-    await pool.query(
-      'INSERT INTO users (user_id, email, password_hash, display_name) VALUES (?, ?, ?, ?)',
-      [userId, email, passwordHash, displayName  || null]
-    );
-    // const accessToken = signToken({ userId });
-    // const refreshToken = signToken({ userId, type: 'refresh' });
-    // const tempToken = signToken({ userId });
-    return res.status(201).json({
-      user: { userId, email, firstName, lastName },
-      // accessToken,
-      // refreshToken,
-      // tempToken
+
+    await prisma.users.create({
+      data: {
+        user_id: userId,
+        email,
+        password_hash: passwordHash,
+        display_name: displayName || null
+      }
     });
+
+    return res.status(201).json({ user: { userId, email, firstName, lastName } });
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
 
 // Mail sending has been extracted to `src/services/mailer.js`.
-
-
 export async function login(req, res) {
   const { email, password } = req.body;
   try {
     // Check if user exists
-    const [rows] = await pool.query(
-      'SELECT user_id, username, display_name, email, password_hash, is_active FROM users WHERE (email = ?) LIMIT 1',
-      [email]
-    );
+    const user = await prisma.users.findUnique({
+      where: { email },
+      select: { user_id: true, username: true, display_name: true, email: true, password_hash: true, is_active: true }
+    });
 
-    if (rows.length === 0) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const user = rows[0];
+    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
     if (!user.is_active) {
       return res.status(403).json({ message: 'Account is disabled' });
     }
@@ -72,41 +54,32 @@ export async function login(req, res) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = ?', [user.user_id]);
+    await prisma.users.update({ where: { user_id: user.user_id }, data: { last_login: new Date() } });
 
     const userId = user.user_id;
     const tempToken = signToken({ userId });
 
     // Generate code and tempToken
     // Insert code and tempToken into database with expiration
-    const code = Math.floor(1000000 + Math.random() * 8999999).toString();
+    const code = Math.floor(100000 + Math.random() * 899999).toString();
 
     // Check if a 2FA code already exists for this user
-    const [result] = await pool.query(
-      'SELECT * FROM 2fa WHERE user_id = ?',
-      [userId]
-    );
-    if (result.length > 0) {
-      // If 2fa code expired, delete it
-      if (new Date(result[0].expires_at) < new Date()) {
-        await pool.query(
-          'DELETE FROM 2fa WHERE user_id = ?',
-          [userId]
-        );
+    const existing2fa = await prisma.fa.findUnique({ where: { user_id: userId } });
+    if (existing2fa) {
+      if (existing2fa.expires_at && new Date(existing2fa.expires_at) < new Date()) {
+        await prisma.fa.delete({ where: { user_id: userId } });
       } else {
-        // If not expired, inform user to check email
-        return res.status(200).json({ message: '2FA code already sent. Please check your email.' });
+        return res.status(200).json({ status: 'require2FA', message: '2FA code already sent. Please check your email.' });
       }
     }
 
     // Send email with code
     await sendMail(user.email, code);
-    await pool.query(
-      'INSERT INTO 2fa (user_id, code, temp_token, expires_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 1 MINUTE))',
-      [userId, code, tempToken]
-    );
+    await prisma.fa.create({ data: { user_id: userId, code, temp_token: tempToken, expires_at: new Date(Date.now() + 60 * 1000) } });
 
-    return res.json({
+    return res.status(200).json({
+      status: "require2FA",
+      message: '2FA code sent to email',
       tempToken
     });
   } catch (err) {
@@ -149,32 +122,16 @@ export async function requestNewAccessToken(req, res) {
 export async function getUserInfo(req, res) {
   const { email, password } = req.body;
   try {
-    const [rows] = await pool.query(
-      'SELECT user_id, username, display_name, email, password_hash, is_active FROM users WHERE (email = ?) LIMIT 1',
-      [email]
-    );
+    if (!email || !password) return res.status(400).json({ message: 'Missing email or password' });
 
-    if (rows.length === 0) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const user = rows[0];
-    if (!user.is_active) {
-      return res.status(403).json({ message: 'Account is disabled' });
-    }
+    const user = await prisma.users.findUnique({ where: { email }, select: { user_id: true, username: true, display_name: true, email: true, password_hash: true, is_active: true } });
+    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+    if (!user.is_active) return res.status(403).json({ message: 'Account is disabled' });
 
     const valid = await verifyPassword(password, user.password_hash);
-    if (!valid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
+    if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
 
-    const userInfo = {
-      user_id: user.user_id,
-      username: user.username || null,
-      display_name: user.display_name || null,
-      email: user.email
-    };
-
+    const userInfo = { user_id: user.user_id, username: user.username || null, display_name: user.display_name || null, email: user.email };
     return res.status(200).json(userInfo);
   } catch (err) {
     console.error(err);
@@ -190,29 +147,28 @@ export async function validate2FA(req, res) {
   // console.log(code);
 
   try {
-    // Check if user exists
-    const [rows] = await pool.query(
-      `SELECT 2fa.user_id, username, display_name, email, password_hash, is_active FROM 2fa
-      JOIN users ON users.user_id = 2fa.user_id 
-      WHERE (code = ?) LIMIT 1`,
-      [code]
-    );
+    // Find 2FA record and include user
+    const record = await prisma.fa.findFirst({ where: { code }, include: { users: true } });
+    if (!record) return res.status(401).json({ message: 'Invalid 2fa code' });
 
-    if (rows.length === 0) {
-      return res.status(401).json({ message: 'Invalid 2fa code' });
+    if (record.expires_at && new Date(record.expires_at) < new Date()) {
+      await prisma.fa.delete({ where: { user_id: record.user_id } }).catch(() => {});
+      return res.status(401).json({ message: '2FA code expired' });
     }
 
-    const user = rows[0];
-    if (!user.is_active) {
-      return res.status(403).json({ message: 'Account is disabled' });
-    }
+    const user = record.users;
+    if (!user || !user.is_active) return res.status(403).json({ message: 'Account is disabled' });
 
     const userId = user.user_id;
-    const accessToken = signToken({ userId: userId, username: user.username });
+    const accessToken = signToken({ userId, username: user.username }, '15m');
     const refreshToken = signToken({ userId, type: 'refresh' });
 
+    // delete used 2FA record
+    await prisma.fa.delete({ where: { user_id: record.user_id } }).catch(() => {});
+
     return res.status(200).json({
-      message: "2FA validation successful",
+      message: '2FA validation successful',
+      user: { userId: user.user_id, username: user.username, displayName: user.display_name, email: user.email },
       accessToken,
       refreshToken
     });
