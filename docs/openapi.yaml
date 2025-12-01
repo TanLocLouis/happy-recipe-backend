@@ -68,10 +68,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /api/auth/login:
+  /api/auth/signin:
     post:
       tags: [Auth]
-      summary: Login with email
+      summary: Sign in with email (initiates 2FA)
       requestBody:
         required: true
         content:
@@ -317,6 +317,43 @@ paths:
                       $ref: '#/components/schemas/PostDetail'
 
   /api/posts/{id}:
+      /api/auth/user-info:
+        post:
+          tags: [Auth]
+          summary: Validate credentials and return user info (no tokens)
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required: [email, password]
+                  properties:
+                    email:
+                      type: string
+                      format: email
+                    password:
+                      type: string
+                      minLength: 8
+          responses:
+            '200':
+              description: Returns user info
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/User'
+            '400':
+              description: Missing email or password
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/Error'
+            '401':
+              description: Invalid credentials
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/Error'
     get:
       tags: [Posts]
       summary: Get a single post by id
