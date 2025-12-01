@@ -25,7 +25,7 @@ model admins {
 
 model comments {
   comment_id        BigInt            @id @default(autoincrement())
-  post_id           String            @db.Char(8)
+  post_id           String            @db.Char(36)
   user_id           String            @db.Char(36)
   comment_text      String            @db.Text
   parent_comment_id BigInt?
@@ -71,7 +71,7 @@ model fa {
 model favorites {
   favorite_id BigInt @id @default(autoincrement())
   user_id     String @db.Char(36)
-  post_id     String @db.Char(8)
+  post_id     String @db.Char(36)
   users       users  @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: Restrict, map: "favorites_ibfk_1")
   posts       posts  @relation(fields: [post_id], references: [post_id], onDelete: Cascade, onUpdate: Restrict, map: "favorites_ibfk_2")
 
@@ -82,7 +82,7 @@ model favorites {
 
 model ingredients {
   ingredient_id   BigInt @id @default(autoincrement())
-  post_id         String @db.Char(8)
+  post_id         String @db.Char(36)
   item_order      Int
   ingredient_text String @db.VarChar(500)
   posts           posts  @relation(fields: [post_id], references: [post_id], onDelete: Cascade, onUpdate: Restrict, map: "ingredients_ibfk_1")
@@ -108,7 +108,7 @@ model moderators {
 
 model post_edit_history {
   history_id  BigInt                        @id @default(autoincrement())
-  post_id     String                        @db.Char(8)
+  post_id     String                        @db.Char(36)
   title       String?                       @db.VarChar(255)
   description String?                       @db.Text
   cook_time   Int?
@@ -126,7 +126,7 @@ model post_moderation {
   moderator_id      BigInt?
   admin_id          BigInt?
   target_type       post_moderation_target_type
-  target_post_id    String?                     @db.Char(8)
+  target_post_id    String?                     @db.Char(36)
   target_comment_id BigInt?
   reason            String?                     @db.Text
   created_at        DateTime                    @default(now()) @db.Timestamp(0)
@@ -143,7 +143,7 @@ model post_moderation {
 }
 
 model posts {
-  post_id           String              @id @db.Char(8)
+  post_id           String              @id @db.Char(36)
   user_id           String              @db.Char(36)
   title             String              @db.VarChar(255)
   description       String?             @db.Text
@@ -172,7 +172,7 @@ model posts {
 
 model reactions {
   reaction_id   BigInt                   @id @default(autoincrement())
-  post_id       String                   @db.Char(8)
+  post_id       String                   @db.Char(36)
   user_id       String                   @db.Char(36)
   reaction_type reactions_reaction_type? @default(like)
   created_at    DateTime                 @default(now()) @db.Timestamp(0)
@@ -186,7 +186,7 @@ model reactions {
 
 model steps {
   step_id          BigInt  @id @default(autoincrement())
-  post_id          String  @db.Char(8)
+  post_id          String  @db.Char(36)
   step_number      Int
   step_description String  @db.Text
   image_url        String? @db.VarChar(500)

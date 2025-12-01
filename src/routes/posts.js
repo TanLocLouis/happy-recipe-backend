@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { createPost, getPost, listPosts, getLatestPosts } from '../controllers/postsController.js';
+import { createPost, getPostByID, listPosts, getLatestPosts, discoverPosts } from '../controllers/postsController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 
 const router = Router();
@@ -23,13 +23,23 @@ router.post(
 );
 
 router.get(
-  '/',
+  '/all',
   [
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('offset').optional().isInt({ min: 0 })
   ],
   validateRequest,
   listPosts
+);
+
+router.get(
+  '/discover',
+  [
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('offset').optional().isInt({ min: 0 })
+  ],
+  validateRequest,
+  discoverPosts 
 );
 
 router.get(
@@ -47,7 +57,7 @@ router.get(
   '/:id',
   [param('id').isString().isLength({ min: 1, max: 32 })],
   validateRequest,
-  getPost
+  getPostByID
 );
 
 export default router;

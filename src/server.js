@@ -21,6 +21,9 @@ app.get('/health', async (req, res) => {
   }
 });
 
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postsRoutes);
 

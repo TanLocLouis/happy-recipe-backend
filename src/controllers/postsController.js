@@ -1,8 +1,48 @@
-import { pool } from '../config/db.js';
+import prisma from '../config/prisma.js';
 import { randomBytes } from 'crypto';
 
 function generatePostId() {
   return randomBytes(4).toString('hex'); // 8 hex chars -> fits `char(8)`
+}
+
+function mapIngredient(ing) {
+  if (!ing) return null;
+  return {
+    ingredientId: ing.ingredient_id,
+    itemOrder: ing.item_order,
+    ingredientText: ing.ingredient_text
+  };
+}
+
+function mapStep(st) {
+  if (!st) return null;
+  return {
+    stepId: st.step_id,
+    stepNumber: st.step_number,
+    stepDescription: st.step_description,
+    imageUrl: st.image_url
+  };
+}
+
+function mapPost(post) {
+  if (!post) return null;
+  return {
+    postId: post.post_id,
+    userId: post.user_id,
+    title: post.title,
+    description: post.description,
+    cookTime: post.cook_time,
+    servings: post.servings,
+    difficulty: post.difficulty,
+    coverImageUrl: post.cover_image_url,
+    createdAt: post.created_at,
+    updatedAt: post.updated_at,
+    isDeleted: post.is_deleted,
+    deletedAt: post.deleted_at,
+    deletedBy: post.deleted_by,
+    ingredients: Array.isArray(post.ingredients) ? post.ingredients.map(mapIngredient) : [],
+    steps: Array.isArray(post.steps) ? post.steps.map(mapStep) : []
+  };
 }
 
 export async function createPost(req, res) {
@@ -24,79 +64,66 @@ export async function createPost(req, res) {
 
   const postId = generatePostId();
 
-  let conn;
   try {
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
+    const ingredientsCreate = Array.isArray(ingredients) && ingredients.length > 0
+      ? ingredients
+          .map(ing => ({
+            item_order: typeof ing.itemOrder === 'number' ? ing.itemOrder : (ing.item_order ?? 0),
+            ingredient_text: ing.ingredientText || ing.text || ing.ingredient_text || null
+          }))
+          .filter(i => i.ingredient_text)
+      : undefined;
 
-    await conn.query(
-      'INSERT INTO posts (post_id, user_id, title, description, cook_time, servings, difficulty, cover_image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [postId, userId, title, description || null, cookTime || null, servings || null, difficulty || null, coverImageUrl || null]
-    );
+    const stepsCreate = Array.isArray(steps) && steps.length > 0
+      ? steps
+          .map(st => ({
+            step_number: typeof st.stepNumber === 'number' ? st.stepNumber : (st.step_number ?? 0),
+            step_description: st.stepDescription || st.description || st.step_description || null,
+            image_url: st.image_url || st.image || null
+          }))
+          .filter(s => s.step_description)
+      : undefined;
 
-    if (Array.isArray(ingredients) && ingredients.length > 0) {
-      for (const ing of ingredients) {
-        const itemOrder = ing.itemOrder ?? null;
-        const ingredientText = ing.ingredientText || ing.text || null;
-        if (!ingredientText) continue;
-        await conn.query(
-          'INSERT INTO ingredients (post_id, item_order, ingredient_text) VALUES (?, ?, ?)',
-          [postId, itemOrder, ingredientText]
-        );
-      }
-    }
+    const created = await prisma.$transaction(async (tx) => {
+      return await tx.posts.create({
+        data: {
+          post_id: postId,
+          user_id: userId,
+          title,
+          description: description || null,
+          cook_time: cookTime ?? null,
+          servings: servings ?? null,
+          difficulty: difficulty || null,
+          cover_image_url: coverImageUrl || null,
+          ingredients: ingredientsCreate ? { create: ingredientsCreate } : undefined,
+          steps: stepsCreate ? { create: stepsCreate } : undefined
+        }
+      });
+    });
 
-    if (Array.isArray(steps) && steps.length > 0) {
-      for (const st of steps) {
-        const stepNumber = st.stepNumber ?? null;
-        const stepDescription = st.stepDescription || st.description || null;
-        const imageUrl = st.image_url || st.image || null;
-        if (!stepDescription) continue;
-        await conn.query(
-          'INSERT INTO steps (post_id, step_number, step_description, image_url) VALUES (?, ?, ?, ?)',
-          [postId, stepNumber, stepDescription, imageUrl]
-        );
-      }
-    }
-
-    await conn.commit();
-
-    return res.status(201).json({ postId });
+    return res.status(201).json({ postId: created.post_id });
   } catch (err) {
-    if (conn) await conn.rollback();
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
-  } finally {
-    if (conn) conn.release();
   }
 }
 
-export async function getPost(req, res) {
+export async function getPostByID(req, res) {
   const { id } = req.params;
   try {
-    const [posts] = await pool.query(
-      'SELECT post_id, user_id, title, description, cook_time, servings, difficulty, cover_image_url, created_at, updated_at FROM posts WHERE post_id = ? AND is_deleted = 0 LIMIT 1',
-      [id]
-    );
+    const post = await prisma.posts.findFirst({
+      where: { post_id: id, is_deleted: false },
+      include: {
+        ingredients: { orderBy: { item_order: 'asc' } },
+        steps: { orderBy: { step_number: 'asc' } }
+      }
+    });
 
-    if (posts.length === 0) return res.status(404).json({ message: 'Post not found' });
+    if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    const post = posts[0];
+    const mappedPost = mapPost(post);
 
-    const [ingredients] = await pool.query(
-      'SELECT ingredient_id, item_order, ingredient_text FROM ingredients WHERE post_id = ? ORDER BY item_order',
-      [id]
-    );
-
-    const [steps] = await pool.query(
-      'SELECT step_id, step_number, step_description, image_url FROM steps WHERE post_id = ? ORDER BY step_number',
-      [id]
-    );
-
-    post.ingredients = ingredients;
-    post.steps = steps;
-
-    return res.status(200).json(post);
+    return res.status(200).json({ post: mappedPost });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
@@ -107,11 +134,91 @@ export async function listPosts(req, res) {
   const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
   const offset = parseInt(req.query.offset || '0', 10);
   try {
-    const [rows] = await pool.query(
-      'SELECT post_id, user_id, title, description, cook_time, servings, difficulty, cover_image_url, created_at FROM posts WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?',
-      [limit, offset]
-    );
-    return res.status(200).json({ posts: rows });
+    const rows = await prisma.posts.findMany({
+      where: { is_deleted: false },
+      select: {
+        post_id: true,
+        user_id: true,
+        title: true,
+        description: true,
+        cook_time: true,
+        servings: true,
+        difficulty: true,
+        cover_image_url: true,
+        created_at: true,
+        updated_at: true,
+        is_deleted: true,
+        deleted_at: true,
+        deleted_by: true
+      },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+      skip: offset
+    });
+    const posts = rows.map(r => ({
+      postId: r.post_id,
+      userId: r.user_id,
+      title: r.title,
+      description: r.description,
+      cookTime: r.cook_time,
+      servings: r.servings,
+      difficulty: r.difficulty,
+      coverImageUrl: r.cover_image_url,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      isDeleted: r.is_deleted,
+      deletedAt: r.deleted_at,
+      deletedBy: r.deleted_by
+    }));
+    return res.status(200).json({ posts });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+export async function discoverPosts(req, res) {
+  const pageParam = req.query.page;
+  const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
+  const offset = parseInt(req.query.offset || '0', 10);
+  try {
+    const rows = await prisma.posts.findMany({
+      where: { is_deleted: false },
+      select: {
+        post_id: true,
+        user_id: true,
+        title: true,
+        description: true,
+        cook_time: true,
+        servings: true,
+        difficulty: true,
+        cover_image_url: true,
+        created_at: true,
+        updated_at: true,
+        is_deleted: true,
+        deleted_at: true,
+        deleted_by: true
+      },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+      skip: offset
+    });
+    const postList = rows.map(r => ({
+      postId: r.post_id,
+      userId: r.user_id,
+      title: r.title,
+      description: r.description,
+      cookTime: r.cook_time,
+      servings: r.servings,
+      difficulty: r.difficulty,
+      coverImageUrl: r.cover_image_url,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      isDeleted: r.is_deleted,
+      deletedAt: r.deleted_at,
+      deletedBy: r.deleted_by
+    }));
+    return res.status(200).json({ postList });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
@@ -124,45 +231,60 @@ export async function getLatestPosts(req, res) {
   const includeDetails = req.query.details === '1' || req.query.details === 'true';
 
   try {
-    const [posts] = await pool.query(
-      'SELECT post_id, user_id, title, description, cook_time, servings, difficulty, cover_image_url, created_at FROM posts WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?',
-      [limit, offset]
-    );
-
-    if (!includeDetails || posts.length === 0) return res.status(200).json({ posts });
-
-    const postIds = posts.map(p => p.post_id);
-    const placeholders = postIds.map(() => '?').join(',');
-
-    const [ingredientsRows] = await pool.query(
-      `SELECT post_id, ingredient_id, item_order, ingredient_text FROM ingredients WHERE post_id IN (${placeholders}) ORDER BY item_order`,
-      postIds
-    );
-
-    const [stepsRows] = await pool.query(
-      `SELECT post_id, step_id, step_number, step_description, image_url FROM steps WHERE post_id IN (${placeholders}) ORDER BY step_number`,
-      postIds
-    );
-
-    const ingredientsMap = {};
-    for (const ing of ingredientsRows) {
-      if (!ingredientsMap[ing.post_id]) ingredientsMap[ing.post_id] = [];
-      ingredientsMap[ing.post_id].push(ing);
+    if (!includeDetails) {
+      const rows = await prisma.posts.findMany({
+        where: { is_deleted: false },
+        select: {
+          post_id: true,
+          user_id: true,
+          title: true,
+          description: true,
+          cook_time: true,
+          servings: true,
+          difficulty: true,
+          cover_image_url: true,
+          created_at: true,
+          updated_at: true,
+          is_deleted: true,
+          deleted_at: true,
+          deleted_by: true
+        },
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        skip: offset
+      });
+      const posts = rows.map(r => ({
+        postId: r.post_id,
+        userId: r.user_id,
+        title: r.title,
+        description: r.description,
+        cookTime: r.cook_time,
+        servings: r.servings,
+        difficulty: r.difficulty,
+        coverImageUrl: r.cover_image_url,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+        isDeleted: r.is_deleted,
+        deletedAt: r.deleted_at,
+        deletedBy: r.deleted_by
+      }));
+      return res.status(200).json({ posts });
     }
 
-    const stepsMap = {};
-    for (const st of stepsRows) {
-      if (!stepsMap[st.post_id]) stepsMap[st.post_id] = [];
-      stepsMap[st.post_id].push(st);
-    }
+    const postsRaw = await prisma.posts.findMany({
+      where: { is_deleted: false },
+      include: {
+        ingredients: { orderBy: { item_order: 'asc' } },
+        steps: { orderBy: { step_number: 'asc' } }
+      },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+      skip: offset
+    });
 
-    const postsWithDetails = posts.map(p => ({
-      ...p,
-      ingredients: ingredientsMap[p.post_id] || [],
-      steps: stepsMap[p.post_id] || []
-    }));
+    const posts = postsRaw.map(mapPost);
 
-    return res.status(200).json({ posts: postsWithDetails });
+    return res.status(200).json({ posts });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
