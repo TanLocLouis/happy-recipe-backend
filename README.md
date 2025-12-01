@@ -38,12 +38,13 @@ npm run dev
 
 ### API
 - POST `/api/auth/signup`
-  - body: `{ "username": "name", "email": "you@example.com", "password": "password", "displayName": "optional" }`
-  - returns: `{ user, token }`
+  - body: `{ "firstName": "John", "lastName": "Doe", "email": "you@example.com", "password": "password", "displayName": "optional" }`
+  - returns: `{ user }` (creates user and sends 2FA/email flows as configured)
 
-- POST `/api/auth/login`
-  - body: `{ "emailOrUsername": "you@example.com", "password": "password" }`
-  - returns: `{ user, token }`
+-- POST `/api/auth/signin`
+  - body: `{ "email": "you@example.com", "password": "password" }`
+  - returns: `{ status: "require2FA", message: "2FA code sent to email", tempToken: "<temp-token>" }`
+  - notes: The server implements an email-based 2FA flow. After calling `/signin` you receive a `tempToken` and must POST the 2FA `code` to `/api/auth/validate/2fa` with header `Authorization: Bearer <tempToken>` to receive `accessToken` and `refreshToken`.
 
 - POST `/api/auth/token`
   - description: Exchange a valid refresh token for a new short-lived access token.
@@ -52,9 +53,32 @@ npm run dev
   - returns: `{ "accessToken": "<new-access-token>" }`
   - notes: Refresh tokens should be JWTs signed with the server secret. If your refresh tokens include a `type` claim, ensure it's set to `"refresh"` when issuing refresh tokens.
 
+  ### Additional auth endpoints
+
+  - POST `/api/auth/validate/2fa`
+    - headers: `Authorization: Bearer <tempToken>` (the temporary token returned by `/signin`)
+    - body: `{ "code": "123456" }`
+    - returns: `{ message, user: { userId, username, displayName, email }, accessToken, refreshToken }`
+
+  - POST `/api/auth/user-info`
+    - body: `{ "email": "you@example.com", "password": "password" }`
+    - returns: user profile information (used to validate credentials without issuing tokens)
+
 ### Notes
 - Schema is defined in `database/happy_recipe.sql`.
 - DB init script: `scripts/init-db.js` (runs the SQL file).
+
+### Prisma / Migrations
+
+- The project includes a Prisma schema at `prisma/schema.prisma`. If you make schema changes, run:
+
+```powershell
+npm install
+npx prisma generate
+npx prisma migrate dev --name update-schema
+```
+
+If you use the provided `scripts/init-db.js` it will run the SQL in `database/happy_recipe.sql` to initialize the DB instead of Prisma migrations.
 
 Additional notes
 - The backend uses UUID strings for `users.user_id` (CHAR(36)) instead of numeric auto-increment ids. The SQL in `database/happy_recipe.sql` has been updated accordingly.

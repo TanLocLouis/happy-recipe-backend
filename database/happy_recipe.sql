@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 20, 2025 at 12:49 PM
+-- Generation Time: Dec 01, 2025 at 12:16 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -20,19 +20,6 @@ SET time_zone = "+00:00";
 --
 -- Database: `happy_recipe`
 --
-
--- --------------------------------------------------------
-
---
--- Table structure for table `2fa`
---
-
-CREATE TABLE `2fa` (
-  `user_id` char(36) NOT NULL,
-  `temp_token` varchar(255) NOT NULL,
-  `code` varchar(20) NOT NULL,
-  `expires_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -85,6 +72,19 @@ CREATE TABLE `dashboard_stats` (
   `total_reactions` int(11) DEFAULT 0,
   `active_bans` int(11) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `fa`
+--
+
+CREATE TABLE `fa` (
+  `user_id` char(36) NOT NULL,
+  `temp_token` varchar(255) NOT NULL,
+  `code` varchar(20) DEFAULT NULL,
+  `expires_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -221,7 +221,7 @@ CREATE TABLE `steps` (
 
 CREATE TABLE `users` (
   `user_id` char(36) NOT NULL,
-  `username` varchar(50) NOT NULL,
+  `username` varchar(50) DEFAULT NULL,
   `email` varchar(255) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `display_name` varchar(100) DEFAULT NULL,
@@ -229,7 +229,7 @@ CREATE TABLE `users` (
   `profile_image_url` varchar(500) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `last_login` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `last_login` timestamp NOT NULL DEFAULT current_timestamp(),
   `is_verified` tinyint(1) DEFAULT 0,
   `is_active` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -253,13 +253,6 @@ CREATE TABLE `user_moderation` (
 --
 -- Indexes for dumped tables
 --
-
---
--- Indexes for table `2fa`
---
-ALTER TABLE `2fa`
-  ADD PRIMARY KEY (`user_id`),
-  ADD KEY `idx_2fa_expires_at` (`expires_at`);
 
 --
 -- Indexes for table `admins`
@@ -287,6 +280,13 @@ ALTER TABLE `dashboard_stats`
   ADD PRIMARY KEY (`stat_id`),
   ADD UNIQUE KEY `stat_date` (`stat_date`),
   ADD KEY `idx_stat_date` (`stat_date`);
+
+--
+-- Indexes for table `fa`
+--
+ALTER TABLE `fa`
+  ADD PRIMARY KEY (`user_id`),
+  ADD KEY `idx_2fa_expires_at` (`expires_at`);
 
 --
 -- Indexes for table `favorites`
@@ -453,18 +453,18 @@ ALTER TABLE `user_moderation`
 --
 
 --
--- Constraints for table `2fa`
---
-ALTER TABLE `2fa`
-  ADD CONSTRAINT `2fa_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
-
---
 -- Constraints for table `comments`
 --
 ALTER TABLE `comments`
   ADD CONSTRAINT `comments_ibfk_1` FOREIGN KEY (`post_id`) REFERENCES `posts` (`post_id`) ON DELETE CASCADE,
   ADD CONSTRAINT `comments_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
   ADD CONSTRAINT `comments_ibfk_3` FOREIGN KEY (`parent_comment_id`) REFERENCES `comments` (`comment_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `fa`
+--
+ALTER TABLE `fa`
+  ADD CONSTRAINT `fa_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `favorites`
