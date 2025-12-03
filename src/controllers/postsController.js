@@ -18,10 +18,8 @@ function mapIngredient(ing) {
 function mapStep(st) {
   if (!st) return null;
   return {
-    stepId: st.step_id,
-    stepNumber: st.step_number,
-    stepDescription: st.step_description,
-    imageUrl: st.image_url
+    stepNum: st.step_number,
+    stepDesc: st.step_description
   };
 }
 
@@ -115,6 +113,7 @@ export async function getPostByID(req, res) {
     const post = await prisma.posts.findFirst({
       where: { post_id: id, is_deleted: false },
       include: {
+        users: { select: { user_id: true, username: true, display_name: true } },
         ingredients: { orderBy: { item_order: 'asc' } },
         steps: { orderBy: { step_number: 'asc' } }
       }
@@ -122,9 +121,44 @@ export async function getPostByID(req, res) {
 
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    const mappedPost = mapPost(post);
+    // Aggregate reactions for this post
+    const reactionsRows = await prisma.reactions.findMany({
+      where: { post_id: id },
+      select: { reaction_type: true }
+    });
 
-    return res.status(200).json({ post: mappedPost });
+    const reactions = { like: 0, heart: 0, yum: 0 };
+    for (const r of reactionsRows) {
+      const type = r.reaction_type || 'like';
+      if (type === 'like' || type === 'heart' || type === 'yum') {
+        reactions[type]++;
+      }
+    }
+
+    // For now, detailed view does not compute per-user actions; default values:
+    const userActions = {
+      userBookmark: false,
+      userReaction: null
+    };
+
+    const detailedPost = {
+      postId: post.post_id,
+      title: post.title,
+      coverImgUrl: post.cover_image_url || null,
+      authorId: post.user_id,
+      authorName: post.users
+        ? (post.users.display_name || post.users.username || null)
+        : null,
+      cookTime: post.cook_time ?? null,
+      servings: post.servings ?? null,
+      difficulty: post.difficulty || null,
+      reactions,
+      userActions,
+      description: post.description || '',
+      steps: Array.isArray(post.steps) ? post.steps.map(mapStep) : []
+    };
+
+    return res.status(200).json({ post: detailedPost });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
@@ -179,9 +213,10 @@ export async function listPosts(req, res) {
 }
 
 export async function discoverPosts(req, res) {
-  const pageParam = req.query.page;
+  const pageParamRaw = req.query.page;
+  const page = Math.max(parseInt(pageParamRaw || '1', 10), 1);
   const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
-  const offset = parseInt(req.query.offset || '0', 10);
+  const offset = (page - 1) * limit;
   try {
     // optional current user id to compute per-user actions
     const currentUserId = req.query.userId || null;
@@ -237,9 +272,11 @@ export async function discoverPosts(req, res) {
       const author = r.users || null;
       const pid = r.post_id;
       const react = reactionsMap[pid] || { like: 0, heart: 0, yum: 0, total: 0 };
-      const userAction = {
-        favorited: currentUserId ? favSet.has(pid) : false,
-        reaction: currentUserId ? (userReactionMap[pid] || null) : null
+
+      // Shape user actions to match frontend `UserActions` type
+      const userActions = {
+        userBookmark: currentUserId ? favSet.has(pid) : false,
+        userReaction: currentUserId ? (userReactionMap[pid] || null) : null
       };
 
       return {
@@ -251,8 +288,12 @@ export async function discoverPosts(req, res) {
         cookTime: r.cook_time ?? null,
         servings: r.servings ?? null,
         difficulty: r.difficulty || null,
-        reactions: react,
-        userActions: userAction
+        reactions: {
+          like: react.like || 0,
+          heart: react.heart || 0,
+          yum: react.yum || 0
+        },
+        userActions
       };
     });
 
@@ -376,9 +417,10 @@ export async function updateReaction(req, res) {
     }
 
     // Check if user already has a reaction for this post
+    // Uses the compound unique constraint on (user_id, post_id)
     const existingReaction = await prisma.reactions.findUnique({
       where: {
-        unique_user_post_reaction: {
+        user_id_post_id: {
           user_id: userId,
           post_id: postId
         }
@@ -390,7 +432,7 @@ export async function updateReaction(req, res) {
       if (existingReaction) {
         await prisma.reactions.delete({
           where: {
-            unique_user_post_reaction: {
+            user_id_post_id: {
               user_id: userId,
               post_id: postId
             }
@@ -402,7 +444,7 @@ export async function updateReaction(req, res) {
       // Upsert reaction (create or update)
       await prisma.reactions.upsert({
         where: {
-          unique_user_post_reaction: {
+          user_id_post_id: {
             user_id: userId,
             post_id: postId
           }
