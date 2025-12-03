@@ -41,7 +41,14 @@ export async function login(req, res) {
     // Check if user exists
     const user = await prisma.users.findUnique({
       where: { email },
-      select: { user_id: true, username: true, display_name: true, email: true, password_hash: true, is_active: true }
+        select: { 
+          user_id: true, 
+          username: true, 
+          display_name: true, 
+          email: true, 
+          password_hash: true, 
+          is_active: true 
+        }
     });
 
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
@@ -74,8 +81,12 @@ export async function login(req, res) {
     }
 
     // Send email with code
-    await sendMail(user.email, code);
-    await prisma.fa.create({ data: { user_id: userId, code, temp_token: tempToken, expires_at: new Date(Date.now() + 60 * 1000) } });
+    sendMail(user.email, code);
+    await prisma.fa.create({ data: { user_id: userId, 
+      code, 
+      temp_token: tempToken, 
+      expires_at: new Date(Date.now() + 60 * 1000) 
+    } });
 
     return res.status(200).json({
       status: "require2FA",
@@ -124,14 +135,33 @@ export async function getUserInfo(req, res) {
   try {
     if (!email || !password) return res.status(400).json({ message: 'Missing email or password' });
 
-    const user = await prisma.users.findUnique({ where: { email }, select: { user_id: true, username: true, display_name: true, email: true, password_hash: true, is_active: true } });
+    const user = await prisma.users.findUnique({ where: { email }, 
+      select: { 
+        user_id: true, 
+        username: true, 
+        display_name: true, 
+        email: true, 
+        password_hash: true, 
+        is_active: true,
+        bio: true,
+        profile_image_url: true,
+        is_verified: true
+    } });
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
     if (!user.is_active) return res.status(403).json({ message: 'Account is disabled' });
 
     const valid = await verifyPassword(password, user.password_hash);
     if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
 
-    const userInfo = { user_id: user.user_id, username: user.username || null, display_name: user.display_name || null, email: user.email };
+    const userInfo = { 
+      userId: user.user_id,
+      username: user.username || null, 
+      displayName: user.display_name || null, 
+      email: user.email,
+      bio: user.bio || null,
+      profileImageUrl: user.profile_image_url || null,
+      isVerified: user.is_verified || false
+    };
     return res.status(200).json(userInfo);
   } catch (err) {
     console.error(err);
