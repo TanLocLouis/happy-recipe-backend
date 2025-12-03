@@ -123,7 +123,50 @@ export async function requestNewAccessToken(req, res) {
     // Issue a new access token (short-lived)
     const accessToken = signToken({ userId, username: payload.username }, '15m');
 
-    return res.status(200).json({ accessToken });
+    // For now we reuse the same refresh token. If you want rotation, issue a new
+    // refresh token here instead.
+    return res.status(200).json({ accessToken, refreshToken });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// Validate an access token coming from the frontend.
+// This is used by the web app's AuthContext `validateAccessToken` helper.
+export async function validateAccessToken(req, res) {
+  try {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : null;
+
+    if (!token) {
+      return res.status(401).json({ message: 'Missing access token' });
+    }
+
+    let payload;
+    try {
+      payload = verifyToken(token);
+    } catch (err) {
+      return res.status(401).json({ message: 'Invalid or expired access token' });
+    }
+
+    // If you ever tag refresh tokens with a `type` field, make sure we are
+    // not accidentally validating a refresh token here.
+    if (payload.type && payload.type === 'refresh') {
+      return res.status(400).json({ message: 'Provided token is not an access token' });
+    }
+
+    const userId = payload.userId || payload.user_id;
+
+    return res.status(200).json({
+      message: 'Access token is valid',
+      user: {
+        userId,
+        username: payload.username || null
+      }
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
