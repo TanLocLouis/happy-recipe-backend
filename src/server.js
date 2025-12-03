@@ -8,9 +8,17 @@ import { testConnection } from './config/db.js';
 
 const app = express();
 
-app.use(helmet());
+// app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: {
+      policy: "cross-origin", // <-- FIX
+    },
+  })
+);
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static("uploads"));
 
 app.get('/health', async (req, res) => {
   try {

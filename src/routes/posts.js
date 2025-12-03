@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { createPost, getPostByID, listPosts, getLatestPosts, discoverPosts } from '../controllers/postsController.js';
+import { createPost, getPostByID, listPosts, getLatestPosts, discoverPosts, updateReaction, updateBookmark } from '../controllers/postsController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
+import path from 'path';
+import cors from 'cors';
 
 const router = Router();
 
@@ -58,6 +60,36 @@ router.get(
   [param('id').isString().isLength({ min: 1, max: 32 })],
   validateRequest,
   getPostByID
+);
+
+// Handle get coverImageUrl separately if needed
+router.get("/files/:filename", cors(), (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.resolve("uploads", filename);
+
+  res.setHeader("Content-Type", "image/jpeg");
+  return res.sendFile(filePath);
+  // return res.status(200).json( { coverImageUrl: filePath } )
+});
+
+router.post(
+  '/reaction',
+  [
+    body('postId').isString().isLength({ min: 1, max: 36 }),
+    body('reaction').optional({ nullable: true, checkFalsy: true }).isIn(['like', 'heart', 'yum', null]).withMessage('Reaction must be like, heart, yum, or null')
+  ],
+  validateRequest,
+  updateReaction
+);
+
+router.post(
+  '/bookmark',
+  [
+    body('postId').isString().isLength({ min: 1, max: 36 }),
+    body('bookmark').isBoolean()
+  ],
+  validateRequest,
+  updateBookmark
 );
 
 export default router;

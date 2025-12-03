@@ -85,6 +85,7 @@ model ingredients {
   post_id         String @db.Char(36)
   item_order      Int
   ingredient_text String @db.VarChar(500)
+  ingredient_unit String @db.VarChar(255)
   posts           posts  @relation(fields: [post_id], references: [post_id], onDelete: Cascade, onUpdate: Restrict, map: "ingredients_ibfk_1")
 
   @@index([post_id], map: "idx_post_id")
