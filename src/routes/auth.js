@@ -1,6 +1,13 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { signup, login, validate2FA, requestNewAccessToken, getUserInfo } from '../controllers/authController.js';
+import {
+  signup,
+  login,
+  validate2FA,
+  requestNewAccessToken,
+  getUserInfo,
+  validateAccessToken
+} from '../controllers/authController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 
 const router = Router();
@@ -20,8 +27,8 @@ router.post(
 router.post('/test', (req, res) => {
   console.log("Test endpoint hit");
   console.log(req.body);
-  return res.status(200).json( {message: "test-ok"});
-})
+  return res.status(200).json({ message: "test-ok" });
+});
 
 router.post(
   '/signin',
@@ -34,21 +41,29 @@ router.post(
 );
 
 router.post(
-  '/validate/2fa', 
+  '/validate/2fa',
   [
     // body('tempToken').isString().isLength({ min: 10 }),
   ],
   validateRequest,
   validate2FA
-)
+);
 
+// Frontend expects POST /api/auth/validate/refresh-token with the refresh token
+// in the Authorization header. This reuses the requestNewAccessToken handler.
 router.post(
-  '/token',
+  '/validate/refresh-token',
   [
     body('refreshToken').optional().isString()
   ],
   validateRequest,
   requestNewAccessToken
+);
+
+// Frontend expects GET /api/auth/validate/access-token
+router.get(
+  '/validate/access-token',
+  validateAccessToken
 );
 
 router.post(
@@ -62,4 +77,3 @@ router.post(
 );
 
 export default router;
-
