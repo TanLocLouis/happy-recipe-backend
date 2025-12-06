@@ -1,6 +1,5 @@
 import prisma from '../config/prisma.js';
 import { randomBytes } from 'crypto';
-import { verifyToken } from '../utils/jwt.js';
 
 function generatePostId() {
   return randomBytes(4).toString('hex'); // 8 hex chars -> fits `char(8)`
@@ -45,8 +44,10 @@ function mapPost(post) {
 }
 
 export async function createPost(req, res) {
+  // userId is available from authenticate middleware
+  const userId = req.userId;
+  
   const {
-    userId,
     title,
     description,
     cookTime,
@@ -57,9 +58,7 @@ export async function createPost(req, res) {
     steps
   } = req.body;
 
-//   console.log(userId, title, description, cookTime, servings, difficulty, coverImageUrl, ingredients, steps);
-
-  if (!userId || !title) return res.status(400).json({ message: 'userId and title are required' });
+  if (!title) return res.status(400).json({ message: 'title is required' });
 
   const postId = generatePostId();
 
@@ -141,6 +140,22 @@ export async function getPostByID(req, res) {
       userReaction: null
     };
 
+    // If userId is available from optional authentication middleware, compute per-user actions
+    if (req.userId) {
+      const currentUserId = req.userId;
+      const [ bookmarkRow, userReaction ] = await Promise.all([
+        prisma.bookmarks.findUnique({ where: { unique_user_post_bookmark: { user_id: currentUserId, post_id: id } } }),
+        prisma.reactions.findUnique({
+          where: {
+            user_id_post_id: { user_id: currentUserId, post_id: id }
+          },
+          select: { reaction_type: true }
+        })
+      ]);
+      userActions.userBookmark = !!bookmarkRow;
+      userActions.userReaction = userReaction ? userReaction.reaction_type : null;
+    }
+
     const detailedPost = {
       postId: post.post_id,
       title: post.title,
@@ -218,8 +233,8 @@ export async function discoverPosts(req, res) {
   const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
   const offset = (page - 1) * limit;
   try {
-    // optional current user id to compute per-user actions
-    const currentUserId = req.query.userId || null;
+    // optional current user id from authentication middleware
+    const currentUserId = req.userId || null;
 
     const rows = await prisma.posts.findMany({
       where: { is_deleted: false },
@@ -256,15 +271,15 @@ export async function discoverPosts(req, res) {
       reactionsMap[pid].total++;
     }
 
-    // if current user specified, fetch their reactions and favorites
+    // if current user specified, fetch their reactions and bookmarks
     let userReactions = [];
-    let userFavorites = [];
+    let userBookmarks = [];
     if (currentUserId) {
       userReactions = await prisma.reactions.findMany({ where: { post_id: { in: postIds }, user_id: currentUserId }, select: { post_id: true, reaction_type: true } });
-      userFavorites = await prisma.favorites.findMany({ where: { post_id: { in: postIds }, user_id: currentUserId }, select: { post_id: true } });
+      userBookmarks = await prisma.bookmarks.findMany({ where: { post_id: { in: postIds }, user_id: currentUserId }, select: { post_id: true } });
     }
 
-    const favSet = new Set(userFavorites.map(f => f.post_id));
+    const favSet = new Set(userBookmarks.map(f => f.post_id));
     const userReactionMap = {};
     for (const ur of userReactions) userReactionMap[ur.post_id] = ur.reaction_type || null;
 
@@ -369,188 +384,3 @@ export async function getLatestPosts(req, res) {
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
-
-/**
- * Update user reaction to a post
- * Handles adding, updating, or removing reactions (like, heart, yum)
- */
-export async function updateReaction(req, res) {
-  try {
-    // Extract userId from JWT token
-    const authHeader = req.headers['authorization'];
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Missing or invalid authorization header' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    let payload;
-    try {
-      payload = verifyToken(token);
-    } catch (err) {
-      return res.status(401).json({ message: 'Invalid or expired token' });
-    }
-
-    const userId = payload.userId || payload.user_id;
-    if (!userId) {
-      return res.status(401).json({ message: 'Invalid token payload' });
-    }
-
-    // Extract request body
-    const { reaction, postId } = req.body;
-
-    if (!postId) {
-      return res.status(400).json({ message: 'postId is required' });
-    }
-
-    // Validate reaction type if provided
-    if (reaction !== null && !['like', 'heart', 'yum'].includes(reaction)) {
-      return res.status(400).json({ message: 'Invalid reaction type. Must be like, heart, yum, or null' });
-    }
-
-    // Verify post exists
-    const post = await prisma.posts.findFirst({
-      where: { post_id: postId, is_deleted: false }
-    });
-
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
-
-    // Check if user already has a reaction for this post
-    // Uses the compound unique constraint on (user_id, post_id)
-    const existingReaction = await prisma.reactions.findUnique({
-      where: {
-        user_id_post_id: {
-          user_id: userId,
-          post_id: postId
-        }
-      }
-    });
-
-    if (reaction === null) {
-      // Remove reaction if it exists
-      if (existingReaction) {
-        await prisma.reactions.delete({
-          where: {
-            user_id_post_id: {
-              user_id: userId,
-              post_id: postId
-            }
-          }
-        });
-      }
-      return res.status(200).json({ message: 'Reaction removed successfully' });
-    } else {
-      // Upsert reaction (create or update)
-      await prisma.reactions.upsert({
-        where: {
-          user_id_post_id: {
-            user_id: userId,
-            post_id: postId
-          }
-        },
-        update: {
-          reaction_type: reaction
-        },
-        create: {
-          user_id: userId,
-          post_id: postId,
-          reaction_type: reaction
-        }
-      });
-      return res.status(200).json({ message: 'Reaction updated successfully' });
-    }
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
-  }
-}
-
-/**
- * Update user bookmark (favorite) for a post
- * Handles adding or removing bookmarks
- */
-export async function updateBookmark(req, res) {
-  try {
-    // Extract userId from JWT token
-    const authHeader = req.headers['authorization'];
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Missing or invalid authorization header' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    let payload;
-    try {
-      payload = verifyToken(token);
-    } catch (err) {
-      return res.status(401).json({ message: 'Invalid or expired token' });
-    }
-
-    const userId = payload.userId || payload.user_id;
-    if (!userId) {
-      return res.status(401).json({ message: 'Invalid token payload' });
-    }
-
-    // Extract request body
-    const { bookmark, postId } = req.body;
-
-    if (!postId) {
-      return res.status(400).json({ message: 'postId is required' });
-    }
-
-    if (typeof bookmark !== 'boolean') {
-      return res.status(400).json({ message: 'bookmark must be a boolean value' });
-    }
-
-    // Verify post exists
-    const post = await prisma.posts.findFirst({
-      where: { post_id: postId, is_deleted: false }
-    });
-
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
-
-    // Check if bookmark already exists
-    const existingBookmark = await prisma.favorites.findUnique({
-      where: {
-        unique_user_post_favorite: {
-          user_id: userId,
-          post_id: postId
-        }
-      }
-    });
-
-    if (bookmark) {
-      // Add bookmark if it doesn't exist
-      if (!existingBookmark) {
-        await prisma.favorites.create({
-          data: {
-            user_id: userId,
-            post_id: postId
-          }
-        });
-      }
-      return res.status(200).json({ message: 'Bookmark added successfully' });
-    } else {
-      // Remove bookmark if it exists
-      if (existingBookmark) {
-        await prisma.favorites.delete({
-          where: {
-            unique_user_post_favorite: {
-              user_id: userId,
-              post_id: postId
-            }
-          }
-        });
-      }
-      return res.status(200).json({ message: 'Bookmark removed successfully' });
-    }
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
-  }
-}
-
-
-

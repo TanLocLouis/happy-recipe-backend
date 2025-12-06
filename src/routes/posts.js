@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { createPost, getPostByID, listPosts, getLatestPosts, discoverPosts, updateReaction, updateBookmark } from '../controllers/postsController.js';
+import { createPost, getPostByID, listPosts, getLatestPosts, discoverPosts } from '../controllers/postsController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
+import { authenticate, optionalAuthenticate } from '../middleware/authenticate.js';
 import path from 'path';
 import cors from 'cors';
 
@@ -9,8 +10,8 @@ const router = Router();
 
 router.post(
   '/',
+  authenticate, // Require authentication
   [
-    body('userId').isString().isLength({ min: 36, max: 36 }),
     body('title').isString().isLength({ min: 1, max: 255 }),
     body('description').optional().isString(),
     body('cookTime').optional().isInt({ min: 0 }),
@@ -36,6 +37,7 @@ router.get(
 
 router.get(
   '/discover',
+  optionalAuthenticate, // Optional authentication for user-specific actions
   [
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('offset').optional().isInt({ min: 0 })
@@ -57,7 +59,8 @@ router.get(
 
 router.get(
   '/:id',
-  [param('id').isString().isLength({ min: 1, max: 32 })],
+  optionalAuthenticate, // Optional authentication for user-specific actions
+  [param('id').isString().isLength({ min: 1, max: 36 })],
   validateRequest,
   getPostByID
 );
@@ -71,25 +74,5 @@ router.get("/files/:filename", cors(), (req, res) => {
   return res.sendFile(filePath);
   // return res.status(200).json( { coverImageUrl: filePath } )
 });
-
-router.post(
-  '/reaction',
-  [
-    body('postId').isString().isLength({ min: 1, max: 36 }),
-    body('reaction').optional({ nullable: true, checkFalsy: true }).isIn(['like', 'heart', 'yum', null]).withMessage('Reaction must be like, heart, yum, or null')
-  ],
-  validateRequest,
-  updateReaction
-);
-
-router.post(
-  '/bookmark',
-  [
-    body('postId').isString().isLength({ min: 1, max: 36 }),
-    body('bookmark').isBoolean()
-  ],
-  validateRequest,
-  updateBookmark
-);
 
 export default router;

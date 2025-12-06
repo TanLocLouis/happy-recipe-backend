@@ -64,10 +64,10 @@ export async function login(req, res) {
     await prisma.users.update({ where: { user_id: user.user_id }, data: { last_login: new Date() } });
 
     const userId = user.user_id;
-    const tempToken = signToken({ userId });
+    const twoFactorToken = signToken({ userId });
 
-    // Generate code and tempToken
-    // Insert code and tempToken into database with expiration
+    // Generate code and twoFactorToken 
+    // Insert code and twoFactorToken into database with expiration
     const code = Math.floor(100000 + Math.random() * 899999).toString();
 
     // Check if a 2FA code already exists for this user
@@ -84,14 +84,14 @@ export async function login(req, res) {
     sendMail(user.email, code);
     await prisma.fa.create({ data: { user_id: userId, 
       code, 
-      temp_token: tempToken, 
+      two_factor_token: twoFactorToken, 
       expires_at: new Date(Date.now() + 60 * 1000) 
     } });
 
     return res.status(200).json({
       status: "require2FA",
       message: '2FA code sent to email',
-      tempToken
+      twoFactorToken
     });
   } catch (err) {
     console.log(err);
@@ -213,7 +213,7 @@ export async function getUserInfo(req, res) {
 }
 
 export async function validate2FA(req, res) {
-  const tempToken = req.headers['authorization']?.split(' ')[1];
+  const twoFactorToken = req.headers['authorization']?.split(' ')[1];
   const code = req.body.code;
 
   // console.log(tempToken);
