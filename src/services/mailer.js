@@ -15,7 +15,7 @@ function generateVerificationEmail(token) {
     </head>
     <body>
       <div class="email-container">
-        <div class="email-header">Verify Your New Account</div>
+        <div class="email-header">Verify Your Login</div>
         <div class="email-body">
           <p>Welcome! Please use the code below to verify your account:</p>
           <a class="email-link">${token}</a>
