@@ -384,3 +384,70 @@ export async function getLatestPosts(req, res) {
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+// Get paginated comments for a post
+export async function getPostComments(req, res) {
+  console.log('getPostComments called');
+  const { id } = req.params; // postId
+  const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '5', 10), 1), 50);
+  const offset = (page - 1) * limit;
+
+  try {
+    // Ensure post exists and not deleted
+    const post = await prisma.posts.findFirst({ where: { post_id: id, is_deleted: false } });
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+
+    const [comments, total] = await Promise.all([
+      prisma.comments.findMany({
+        where: { post_id: id, is_deleted: false },
+        include: {
+          users: { select: { user_id: true, username: true, display_name: true, profile_image_url: true } }
+        },
+        orderBy: { created_at: 'asc' },
+        skip: offset,
+        take: limit
+      }),
+      prisma.comments.count({ where: { post_id: id, is_deleted: false } })
+    ]);
+
+    // Compute reply counts for these comments
+    const commentIds = comments.map(c => c.comment_id);
+    const replyCounts = commentIds.length > 0
+      ? await prisma.comments.groupBy({
+          by: ['parent_comment_id'],
+          where: { parent_comment_id: { in: commentIds } },
+          _count: { parent_comment_id: true }
+        })
+      : [];
+    const replyCountMap = new Map();
+    for (const rc of replyCounts) {
+      // parent_comment_id is BigInt; convert to string key for map
+      replyCountMap.set(String(rc.parent_comment_id), rc._count.parent_comment_id);
+    }
+
+    const items = comments.map(c => ({
+      commentId: String(c.comment_id),
+      postId: c.post_id,
+      userId: c.user_id, // stored as string in schema; FE expected number but schema uses CHAR(36)
+      userName: c.users?.display_name || c.users?.username || '',
+      content: c.comment_text,
+      createdAt: c.created_at,
+      parentCommentID: c.parent_comment_id ? String(c.parent_comment_id) : null,
+      replyCount: replyCountMap.get(String(c.comment_id)) || 0
+    }));
+
+    return res.status(200).json({
+      comments: items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit))
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}

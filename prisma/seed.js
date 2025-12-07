@@ -108,10 +108,12 @@ async function main() {
 
   console.log(`Created ${createdPosts.length} posts for ${users.length} users.`);
 
-  // Create comments: for a subset of posts create several comments from random users
+  // Create comments (and occasional replies) for posts
   const commentsCreated = [];
   for (const post of createdPosts) {
-    const commentCount = randInt(0, 5);
+    const commentCount = randInt(1, 5); // ensure each post gets at least 1 comment
+    const topLevelComments = [];
+
     for (let c = 0; c < commentCount; c++) {
       const commenter = pick(users);
       try {
@@ -123,14 +125,34 @@ async function main() {
             parent_comment_id: null
           }
         });
+        topLevelComments.push(comm);
         commentsCreated.push(comm);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Add a reply to the first top-level comment sometimes
+    if (topLevelComments.length > 0 && Math.random() > 0.5) {
+      const parent = topLevelComments[0];
+      const replier = pick(users);
+      try {
+        const reply = await prisma.comments.create({
+          data: {
+            post_id: post.post_id,
+            user_id: replier.user_id,
+            comment_text: `${pick(['Agree!', 'Looks good', 'Trying this', 'Thanks for sharing'])}`,
+            parent_comment_id: parent.comment_id
+          }
+        });
+        commentsCreated.push(reply);
       } catch (e) {
         // ignore
       }
     }
   }
 
-  console.log(`Created ${commentsCreated.length} comments.`);
+  console.log(`Created ${commentsCreated.length} comments (including replies).`);
 
   // Create reactions for posts by random users
   const reactionTypes = ['like', 'heart', 'yum'];

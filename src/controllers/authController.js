@@ -174,32 +174,33 @@ export async function validateAccessToken(req, res) {
 }
 
 export async function getUserInfo(req, res) {
-  const { email, password } = req.body;
-  try {
-    if (!email || !password) return res.status(400).json({ message: 'Missing email or password' });
+  // Prefer userId injected by auth middleware; fall back to params/query/body for flexibility
+  const userId = req.userId || req.params?.userId || req.query?.userId || req.body?.userId;
 
-    const user = await prisma.users.findUnique({ where: { email }, 
-      select: { 
-        user_id: true, 
-        username: true, 
-        display_name: true, 
-        email: true, 
-        password_hash: true, 
+  try {
+    if (!userId) return res.status(400).json({ message: 'Missing userId' });
+
+    const user = await prisma.users.findUnique({
+      where: { user_id: userId },
+      select: {
+        user_id: true,
+        username: true,
+        display_name: true,
+        email: true,
         is_active: true,
         bio: true,
         profile_image_url: true,
         is_verified: true
-    } });
-    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+      }
+    });
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
     if (!user.is_active) return res.status(403).json({ message: 'Account is disabled' });
 
-    const valid = await verifyPassword(password, user.password_hash);
-    if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
-
-    const userInfo = { 
+    const userInfo = {
       userId: user.user_id,
-      username: user.username || null, 
-      displayName: user.display_name || null, 
+      username: user.username || null,
+      displayName: user.display_name || null,
       email: user.email,
       bio: user.bio || null,
       profileImageUrl: user.profile_image_url || null,

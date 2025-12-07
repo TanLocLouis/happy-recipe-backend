@@ -1,13 +1,14 @@
 
-## Happy Food Backend (Auth + MySQL)
+## Happy Food Backend (Express + Prisma + MySQL)
+
+Minimal setup guide plus the current HTTP surface (auth, posts, bookmarks, comments).
 
 ### Prerequisites
 - Node.js 18+
 - MySQL 8+
 
-### Setup
-1. Create a `.env` in the project root:
-
+### Quick start
+1) Copy `.env.example` (or create `.env`):
 ```
 PORT=4000
 DB_HOST=localhost
@@ -20,75 +21,53 @@ JWT_EXPIRES_IN=7d
 VITE_MAIL=your.email@gmail.com
 VITE_MAILTOKEN=your_gmail_app_password
 ```
-
-2. Install dependencies:
+2) Install deps
 ```
 npm install
 ```
-
-3. Initialize the database (creates `happy_recipe` and tables):
+3) Initialize DB schema (runs `database/happy_recipe.sql`)
 ```
 npm run db:init
 ```
-
-4. Start the server:
+4) Seed sample data (users, posts, comments, reactions, bookmarks)
+```
+npx prisma db seed
+```
+5) Run the API server
 ```
 npm run dev
 ```
 
-### API
-- POST `/api/auth/signup`
-  - body: `{ "firstName": "John", "lastName": "Doe", "email": "you@example.com", "password": "password", "displayName": "optional" }`
-  - returns: `{ user }` (creates user and sends 2FA/email flows as configured)
+### API overview (paths are under `/api`)
+- Auth
+  - `POST /auth/signup` — create account.
+  - `POST /auth/signin` — start email 2FA; returns `tempToken`.
+  - `POST /auth/validate/2fa` — exchange code + `tempToken` for `accessToken` + `refreshToken`.
+  - `POST /auth/validate/refresh-token` — refresh access token (accepts header or body token).
+  - `GET /auth/validate/access-token` — simple access-token check.
+  - `GET /auth/user-info` — returns user profile for the authenticated user (uses `req.userId`, no password check).
+- Posts
+  - `POST /posts` — create post (auth required).
+  - `GET /posts/all` — list posts (paginated `limit/offset`).
+  - `GET /posts/discover` — feed with reactions/bookmarks (optional auth to shape `userActions`).
+  - `GET /posts/latest` — latest posts; `details=true` includes ingredients/steps.
+  - `GET /posts/:id` — single post detail; optional auth populates `userActions`.
+  - `GET /posts/:id/comments` — paginated comments with reply counts (`page`, `limit`).
+- Reactions & bookmarks
+  - `POST /user-action/user-action` — unified mutations for reactions or bookmarks. Body: `{ action: "reaction" | "bookmark", postId, newReaction?, newBookmark? }` (auth required).
+  - `GET /user-action/bookmarks` — list current user's bookmarks.
 
--- POST `/api/auth/signin`
-  - body: `{ "email": "you@example.com", "password": "password" }`
-  - returns: `{ status: "require2FA", message: "2FA code sent to email", tempToken: "<temp-token>" }`
-  - notes: The server implements an email-based 2FA flow. After calling `/signin` you receive a `tempToken` and must POST the 2FA `code` to `/api/auth/validate/2fa` with header `Authorization: Bearer <tempToken>` to receive `accessToken` and `refreshToken`.
+### Data / Prisma notes
+- Schema lives in `prisma/schema.prisma`; generated client is used across controllers.
+- `users.user_id` is a UUID string (CHAR(36)).
+- `BigInt.prototype.toJSON` is patched in `server.js` so IDs serialize as strings.
 
-- POST `/api/auth/token`
-  - description: Exchange a valid refresh token for a new short-lived access token.
-  - body (JSON): `{ "refreshToken": "<refresh-token>" }` (optional if you provide the token in the Authorization header)
-  - header option: `Authorization: Bearer <refresh-token>`
-  - returns: `{ "accessToken": "<new-access-token>" }`
-  - notes: Refresh tokens should be JWTs signed with the server secret. If your refresh tokens include a `type` claim, ensure it's set to `"refresh"` when issuing refresh tokens.
+### Database
+- SQL schema: `database/happy_recipe.sql` (used by `npm run db:init`).
+- Prisma seed: `prisma/seed.js` (triggered via `npx prisma db seed`).
 
-  ### Additional auth endpoints
-
-  - POST `/api/auth/validate/2fa`
-    - headers: `Authorization: Bearer <tempToken>` (the temporary token returned by `/signin`)
-    - body: `{ "code": "123456" }`
-    - returns: `{ message, user: { userId, username, displayName, email }, accessToken, refreshToken }`
-
-  - POST `/api/auth/user-info`
-    - body: `{ "email": "you@example.com", "password": "password" }`
-    - returns: user profile information (used to validate credentials without issuing tokens)
-
-### Notes
-- Schema is defined in `database/happy_recipe.sql`.
-- DB init script: `scripts/init-db.js` (runs the SQL file).
-
-### Prisma / Migrations
-
-- The project includes a Prisma schema at `prisma/schema.prisma`. If you make schema changes, run:
-
-```powershell
-npm install
-npx prisma generate
-npx prisma migrate dev --name update-schema
-```
-
-If you use the provided `scripts/init-db.js` it will run the SQL in `database/happy_recipe.sql` to initialize the DB instead of Prisma migrations.
-
-Additional notes
-- The backend uses UUID strings for `users.user_id` (CHAR(36)) instead of numeric auto-increment ids. The SQL in `database/happy_recipe.sql` has been updated accordingly.
-- A `2fa` table is included in the SQL to support server-side two-factor authentication flows. The table stores `user_id` (CHAR(36)), `temp_token`, `code`, and `expires_at`.
-- Environment variables `VITE_MAIL` and `VITE_MAILTOKEN` are required for sending verification emails. For Gmail, generate an App Password and set it as `VITE_MAILTOKEN`.
-
-### API Documentation
-- OpenAPI spec: `docs/openapi.yaml`
-  - View via Swagger Editor: open `https://editor.swagger.io/` and paste the YAML
-- Postman collection: `docs/postman_collection.json`
-  - Import into Postman to test endpoints
+### API documentation
+- OpenAPI: `docs/openapi.yaml` (paste into https://editor.swagger.io/).
+- Postman: `docs/postman_collection.json`.
 
 
