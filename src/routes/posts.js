@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { createPost, getPostByID, listPosts, getLatestPosts, discoverPosts } from '../controllers/postsController.js';
+import { createPost, getPostByID, listPosts, getLatestPosts, discoverPosts, getPostComments } from '../controllers/postsController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { authenticate, optionalAuthenticate } from '../middleware/authenticate.js';
 import path from 'path';
@@ -63,6 +63,18 @@ router.get(
   [param('id').isString().isLength({ min: 1, max: 36 })],
   validateRequest,
   getPostByID
+);
+
+router.get(
+  '/:id/comments',
+  optionalAuthenticate,
+  [
+    param('id').isString().isLength({ min: 1, max: 36 }),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 50 })
+  ],
+  validateRequest,
+  getPostComments
 );
 
 // Handle get coverImageUrl separately if needed

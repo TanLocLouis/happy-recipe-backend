@@ -9,6 +9,7 @@ import {
   validateAccessToken
 } from '../controllers/authController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
+import { authenticate } from '../middleware/authenticate.js';
 
 const router = Router();
 
@@ -66,12 +67,13 @@ router.get(
   validateAccessToken
 );
 
-router.post(
+router.get(
   '/user-info',
   [
-    body('email').isEmail().normalizeEmail(),
-    body('password').isString().isLength({ min: 8 })
+    body('email').optional().isEmail().normalizeEmail(),
+    body('password').optional().isString().isLength({ min: 8 })
   ],
+  authenticate,
   validateRequest,
   getUserInfo
 );
