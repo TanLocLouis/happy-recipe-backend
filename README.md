@@ -27,7 +27,8 @@ npm install
 ```
 3) Initialize DB schema (runs `database/happy_recipe.sql`)
 ```
-npm run db:init
+npx prisma db push
+npx prisma generate
 ```
 4) Seed sample data (users, posts, comments, reactions, bookmarks)
 ```

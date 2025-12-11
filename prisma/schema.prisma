@@ -44,7 +44,7 @@ model dashboard_stats {
 
 model fa {
   user_id          String   @id @db.Char(36)
-  code             String?  @db.VarChar(20)
+  code             String?  @db.VarChar(6)
   expires_at       DateTime @default(now()) @db.Timestamp(0)
   two_factor_token String   @db.VarChar(255)
   users            users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: Restrict, map: "fa_ibfk_1")
@@ -82,7 +82,6 @@ model ingredients {
   post_id         String @db.Char(36)
   item_order      Int
   ingredient_text String @db.VarChar(500)
-  ingredient_unit String @db.VarChar(255)
   posts           posts  @relation(fields: [post_id], references: [post_id], onDelete: Cascade, onUpdate: Restrict, map: "ingredients_ibfk_1")
 
   @@index([post_id], map: "idx_post_id")
