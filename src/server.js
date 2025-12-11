@@ -5,6 +5,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.js';
 import postsRoutes from './routes/posts.js';
 import userActionRoutes from './routes/userAction.js';
+import moderatorRoutes from './routes/moderator.js';
 import { testConnection } from './config/db.js';
 
 const app = express();
@@ -36,6 +37,7 @@ BigInt.prototype.toJSON = function () {
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/user-action', userActionRoutes);
+app.use('/api/moderator', moderatorRoutes);
 
 app.use((req, res, next) => {
   res.status(404).json({ message: 'Not found' });

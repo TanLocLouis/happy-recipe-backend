@@ -7,22 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model admins {
-  admin_id        BigInt            @id @default(autoincrement())
-  username        String            @unique(map: "username") @db.VarChar(50)
-  email           String            @unique(map: "email") @db.VarChar(255)
-  password_hash   String            @db.VarChar(255)
-  display_name    String?           @db.VarChar(100)
-  created_at      DateTime          @default(now()) @db.Timestamp(0)
-  is_active       Boolean?          @default(true)
-  last_login      DateTime          @default(dbgenerated("('0000-00-00 00:00:00')")) @db.Timestamp(0)
-  post_moderation post_moderation[]
-  user_moderation user_moderation[]
-
-  @@index([email], map: "idx_email")
-  @@index([username], map: "idx_username")
-}
-
 model comments {
   comment_id        BigInt            @id @default(autoincrement())
   post_id           String            @db.Char(36)
@@ -59,11 +43,11 @@ model dashboard_stats {
 }
 
 model fa {
-  user_id    String   @id @db.Char(36)
+  user_id          String   @id @db.Char(36)
+  code             String?  @db.VarChar(20)
+  expires_at       DateTime @default(now()) @db.Timestamp(0)
   two_factor_token String   @db.VarChar(255)
-  code       String?  @db.VarChar(20)
-  expires_at DateTime @default(now()) @db.Timestamp(0)
-  users      users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: Restrict, map: "fa_ibfk_1")
+  users            users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: Restrict, map: "fa_ibfk_1")
 
   @@index([expires_at], map: "idx_2fa_expires_at")
 }
@@ -89,7 +73,6 @@ model bookmarks {
   posts       posts  @relation(fields: [post_id], references: [post_id], onDelete: Cascade, onUpdate: Restrict, map: "bookmarks_ibfk_2")
 
   @@unique([user_id, post_id], name: "unique_user_post_bookmark")
-  @@unique([user_id, post_id], map: "unique_user_post_bookmark")
   @@index([post_id], map: "idx_post_id")
   @@index([user_id], map: "idx_user_id")
 }
@@ -103,22 +86,6 @@ model ingredients {
   posts           posts  @relation(fields: [post_id], references: [post_id], onDelete: Cascade, onUpdate: Restrict, map: "ingredients_ibfk_1")
 
   @@index([post_id], map: "idx_post_id")
-}
-
-model moderators {
-  moderator_id    BigInt            @id @default(autoincrement())
-  username        String            @unique(map: "username") @db.VarChar(50)
-  email           String            @unique(map: "email") @db.VarChar(255)
-  password_hash   String            @db.VarChar(255)
-  display_name    String?           @db.VarChar(100)
-  created_at      DateTime          @default(now()) @db.Timestamp(0)
-  is_active       Boolean?          @default(true)
-  last_login      DateTime          @default(dbgenerated("('0000-00-00 00:00:00')")) @db.Timestamp(0)
-  post_moderation post_moderation[]
-  user_moderation user_moderation[]
-
-  @@index([email], map: "idx_email")
-  @@index([username], map: "idx_username")
 }
 
 model post_edit_history {
@@ -138,23 +105,20 @@ model post_edit_history {
 
 model post_moderation {
   action_id         BigInt                      @id @default(autoincrement())
-  moderator_id      BigInt?
-  admin_id          BigInt?
   target_type       post_moderation_target_type
   target_post_id    String?                     @db.Char(36)
   target_comment_id BigInt?
   reason            String?                     @db.Text
   created_at        DateTime                    @default(now()) @db.Timestamp(0)
-  moderators        moderators?                 @relation(fields: [moderator_id], references: [moderator_id], onUpdate: Restrict, map: "post_moderation_ibfk_1")
-  admins            admins?                     @relation(fields: [admin_id], references: [admin_id], onUpdate: Restrict, map: "post_moderation_ibfk_2")
+  actor_user_id     String                      @db.Char(36)
+  users             users                       @relation(fields: [actor_user_id], references: [user_id], onUpdate: Restrict, map: "post_moderation_ibfk_1")
   posts             posts?                      @relation(fields: [target_post_id], references: [post_id], onUpdate: Restrict, map: "post_moderation_ibfk_3")
   comments          comments?                   @relation(fields: [target_comment_id], references: [comment_id], onUpdate: Restrict, map: "post_moderation_ibfk_4")
 
-  @@index([admin_id], map: "admin_id")
   @@index([created_at], map: "idx_created_at")
   @@index([target_comment_id], map: "idx_target_comment")
   @@index([target_post_id], map: "idx_target_post")
-  @@index([moderator_id], map: "moderator_id")
+  @@index([actor_user_id], map: "idx_actor_user_id")
 }
 
 model posts {
@@ -171,6 +135,7 @@ model posts {
   is_deleted        Boolean?            @default(false)
   deleted_at        DateTime?           @db.Timestamp(0)
   deleted_by        String?             @db.Char(36)
+  bookmarks         bookmarks[]
   comments          comments[]
   favorites         favorites[]
   ingredients       ingredients[]
@@ -179,7 +144,6 @@ model posts {
   users             users               @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: Restrict, map: "posts_ibfk_1")
   reactions         reactions[]
   steps             steps[]
-  bookmarks         bookmarks[]
 
   @@index([created_at], map: "idx_created_at")
   @@index([is_deleted], map: "idx_is_deleted")
@@ -212,46 +176,47 @@ model steps {
 }
 
 model user_moderation {
-  action_id    BigInt                      @id @default(autoincrement())
-  user_id      String                      @db.Char(36)
-  moderator_id BigInt?
-  admin_id     BigInt?
-  action_type  user_moderation_action_type
-  reason       String                      @db.Text
-  created_at   DateTime                    @default(now()) @db.Timestamp(0)
-  users        users                       @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: Restrict, map: "user_moderation_ibfk_1")
-  moderators   moderators?                 @relation(fields: [moderator_id], references: [moderator_id], onUpdate: Restrict, map: "user_moderation_ibfk_2")
-  admins       admins?                     @relation(fields: [admin_id], references: [admin_id], onUpdate: Restrict, map: "user_moderation_ibfk_3")
+  action_id                                   BigInt                      @id @default(autoincrement())
+  action_type                                 user_moderation_action_type
+  reason                                      String                      @db.Text
+  created_at                                  DateTime                    @default(now()) @db.Timestamp(0)
+  actor_user_id                               String                      @db.Char(36)
+  target_user_id                              String                      @db.Char(36)
+  users_user_moderation_target_user_idTousers users                       @relation("user_moderation_target_user_idTousers", fields: [target_user_id], references: [user_id], onDelete: Cascade, onUpdate: Restrict, map: "user_moderation_ibfk_1")
+  users_user_moderation_actor_user_idTousers  users                       @relation("user_moderation_actor_user_idTousers", fields: [actor_user_id], references: [user_id], onUpdate: Restrict, map: "user_moderation_ibfk_2")
 
-  @@index([admin_id], map: "admin_id")
   @@index([created_at], map: "idx_created_at")
-  @@index([user_id], map: "idx_user_id")
-  @@index([moderator_id], map: "moderator_id")
+  @@index([actor_user_id], map: "idx_actor_user_id")
+  @@index([target_user_id], map: "idx_target_user_id")
 }
 
 model users {
-  user_id           String            @id @db.Char(36)
-  username          String?           @unique(map: "username") @db.VarChar(50)
-  email             String            @unique(map: "email") @db.VarChar(255)
-  password_hash     String            @db.VarChar(255)
-  display_name      String?           @db.VarChar(100)
-  bio               String?           @db.Text
-  profile_image_url String?           @db.VarChar(500)
-  created_at        DateTime          @default(now()) @db.Timestamp(0)
-  updated_at        DateTime          @default(now()) @db.Timestamp(0)
-  last_login        DateTime          @default(now()) @db.Timestamp(0)
-  is_verified       Boolean?          @default(false)
-  is_active         Boolean?          @default(true)
-  comments          comments[]
-  fa                fa?
-  favorites         favorites[]
-  posts             posts[]
-  reactions         reactions[]
-  user_moderation   user_moderation[]
-  bookmarks         bookmarks[]
+  user_id                                               String            @id @db.Char(36)
+  username                                              String?           @unique(map: "username") @db.VarChar(50)
+  email                                                 String            @unique(map: "email") @db.VarChar(255)
+  password_hash                                         String            @db.VarChar(255)
+  display_name                                          String?           @db.VarChar(100)
+  bio                                                   String?           @db.Text
+  profile_image_url                                     String?           @db.VarChar(500)
+  created_at                                            DateTime          @default(now()) @db.Timestamp(0)
+  updated_at                                            DateTime          @default(now()) @db.Timestamp(0)
+  last_login                                            DateTime          @default(now()) @db.Timestamp(0)
+  is_verified                                           Boolean?          @default(false)
+  is_active                                             Boolean?          @default(true)
+  role                                                  users_role        @default(USER)
+  bookmarks                                             bookmarks[]
+  comments                                              comments[]
+  fa                                                    fa?
+  favorites                                             favorites[]
+  post_moderation                                       post_moderation[]
+  posts                                                 posts[]
+  reactions                                             reactions[]
+  user_moderation_user_moderation_target_user_idTousers user_moderation[] @relation("user_moderation_target_user_idTousers")
+  user_moderation_user_moderation_actor_user_idTousers  user_moderation[] @relation("user_moderation_actor_user_idTousers")
 
   @@index([email], map: "idx_email")
   @@index([username], map: "idx_username")
+  @@index([role], map: "idx_role")
 }
 
 enum post_moderation_target_type {
@@ -268,6 +233,7 @@ enum reactions_reaction_type {
 enum user_moderation_action_type {
   warning
   ban
+  unban
 }
 
 enum posts_difficulty {
@@ -280,4 +246,10 @@ enum post_edit_history_difficulty {
   easy
   medium
   hard
+}
+
+enum users_role {
+  USER
+  MODERATOR
+  ADMIN
 }
