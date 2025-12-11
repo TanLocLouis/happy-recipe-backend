@@ -190,7 +190,7 @@ export async function getUserInfo(req, res) {
         is_active: true,
         bio: true,
         profile_image_url: true,
-        is_verified: true
+        is_verified: true,
       }
     });
 
@@ -204,7 +204,7 @@ export async function getUserInfo(req, res) {
       email: user.email,
       bio: user.bio || null,
       profileImageUrl: user.profile_image_url || null,
-      isVerified: user.is_verified || false
+      isVerified: user.is_verified || false,
     };
     return res.status(200).json(userInfo);
   } catch (err) {
@@ -216,9 +216,6 @@ export async function getUserInfo(req, res) {
 export async function validate2FA(req, res) {
   const twoFactorToken = req.headers['authorization']?.split(' ')[1];
   const code = req.body.code;
-
-  // console.log(tempToken);
-  // console.log(code);
 
   try {
     // Find 2FA record and include user
@@ -242,7 +239,7 @@ export async function validate2FA(req, res) {
 
     return res.status(200).json({
       message: '2FA validation successful',
-      user: { userId: user.user_id, username: user.username, displayName: user.display_name, email: user.email },
+      user: { userId: user.user_id, username: user.username, displayName: user.display_name, email: user.email, role: user.role },
       accessToken,
       refreshToken
     });
