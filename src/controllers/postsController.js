@@ -181,8 +181,13 @@ export async function getPostByID(req, res) {
 }
 
 export async function listPosts(req, res) {
-  const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
-  const offset = parseInt(req.query.offset || '0', 10);
+  // const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
+  // const offset = parseInt(req.query.offset || '0', 10);
+
+  const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+  const offset = (page - 1) * limit;
+  
   try {
     const rows = await prisma.posts.findMany({
       where: { is_deleted: false },
@@ -387,7 +392,7 @@ export async function getLatestPosts(req, res) {
 
 // Get paginated comments for a post
 export async function getPostComments(req, res) {
-  console.log('getPostComments called');
+  console.log('[DEBUG] getPostComments called');
   const { id } = req.params; // postId
   const page = Math.max(parseInt(req.query.page || '1', 10), 1);
   const limit = Math.min(Math.max(parseInt(req.query.limit || '5', 10), 1), 50);

@@ -85,7 +85,7 @@ export async function login(req, res) {
     await prisma.fa.create({ data: { user_id: userId, 
       code, 
       two_factor_token: twoFactorToken, 
-      expires_at: new Date(Date.now() + 60 * 1000) 
+      expires_at: new Date(Date.now() + Number(process.env.TWO_FA_EXPIRES_IN) || 15*60*1000)
     } });
 
     return res.status(200).json({

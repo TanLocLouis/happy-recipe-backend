@@ -28,6 +28,7 @@ router.post(
 router.get(
   '/all',
   [
+    query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('offset').optional().isInt({ min: 0 })
   ],
@@ -39,6 +40,7 @@ router.get(
   '/discover',
   optionalAuthenticate, // Optional authentication for user-specific actions
   [
+    query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('offset').optional().isInt({ min: 0 })
   ],
@@ -49,6 +51,7 @@ router.get(
 router.get(
   '/latest',
   [
+    query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('offset').optional().isInt({ min: 0 }),
     query('details').optional().isBoolean()
@@ -71,7 +74,8 @@ router.get(
   [
     param('id').isString().isLength({ min: 1, max: 36 }),
     query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 50 })
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('offset').optional().isInt({ min: 0 }),
   ],
   validateRequest,
   getPostComments

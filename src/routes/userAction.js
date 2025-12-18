@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { uploadUserAction, listBookmarks } from '../controllers/userActionController.js';
+import { uploadUserAction } from '../controllers/userActionController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { authenticate } from '../middleware/authenticate.js';
 
@@ -17,13 +17,6 @@ router.post(
   ],
   validateRequest,
   uploadUserAction
-);
-
-router.get(
-  '/bookmarks',
-  authenticate, // Require authentication
-  validateRequest,
-  listBookmarks
 );
 
 export default router;
