@@ -97,7 +97,7 @@ export async function uploadUserAction(req, res) {
       if (newBookmark) {
         // Add bookmark if it doesn't exist
         if (!existingBookmark) {
-          console.log('Creating new bookmark');
+          console.log('[DEBUG] Creating new bookmark');
           await prisma.bookmarks.create({ data: { user_id: userId, post_id: postId } });
         }
         return res.status(200).json({ message: 'Bookmark added successfully' });
@@ -117,59 +117,3 @@ export async function uploadUserAction(req, res) {
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
-
-export async function listBookmarks(req, res) {
-  try {
-    // userId is available from authenticate middleware
-    const userId = req.userId;
-
-    const rows = await prisma.bookmarks.findMany({
-      where: { user_id: userId },
-      include: {
-        posts: {
-          select: {
-            post_id: true,
-            user_id: true,
-            title: true,
-            description: true,
-            cook_time: true,
-            servings: true,
-            difficulty: true,
-            cover_image_url: true,
-            created_at: true,
-            updated_at: true,
-            is_deleted: true,
-            deleted_at: true,
-            deleted_by: true,
-            users: { select: { user_id: true, username: true, display_name: true } }
-          }
-        }
-      },
-      orderBy: { bookmark_id: 'desc' }
-    });
-
-    const bookmarks = rows
-      .filter(r => r.posts && !r.posts.is_deleted)
-      .map(r => {
-        const p = r.posts;
-        const author = p.users || null;
-        return {
-          postId: p.post_id,
-          title: p.title,
-          coverImgUrl: p.cover_image_url || null,
-          authorId: p.user_id,
-          authorName: author ? (author.display_name || author.username || null) : null,
-          cookTime: p.cook_time ?? null,
-          servings: p.servings ?? null,
-          difficulty: p.difficulty || null,
-          createdAt: p.created_at
-        };
-      });
-
-    return res.status(200).json({ bookmarks });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
-  }
-}
-
