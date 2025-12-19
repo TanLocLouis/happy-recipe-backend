@@ -180,3 +180,53 @@ export async function listUserPosts(req, res) {
   }
 }
 
+export async function editProfile(req, res) {
+  console.log('[DEBUG] editProfile called');
+  try {
+    const userId = req.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized: user not authenticated' });
+    }
+
+    const { displayName, bio } = req.body;
+    const data = {};
+
+    if (displayName !== undefined && displayName !== null && displayName.trim() !== '') {
+      data.display_name = displayName.trim();
+    }
+    if (bio !== undefined && bio !== null && bio.trim() !== '') {
+      data.bio = bio.trim();
+    }
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ message: 'No changes provided' });
+    }
+
+    const updated = await prisma.users.update({
+      where: { user_id: userId },
+      data,
+      select: {
+        user_id: true,
+        username: true,
+        display_name: true,
+        bio: true,
+        profile_image_url: true
+      }
+    });
+
+    return res.status(200).json({
+      profile: {
+        userId: updated.user_id,
+        username: updated.username,
+        displayName: updated.display_name,
+        bio: updated.bio,
+        avatarUrl: updated.profile_image_url || null
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+

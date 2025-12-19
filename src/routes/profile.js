@@ -1,8 +1,11 @@
 import { Router } from 'express';
-import { query } from 'express-validator';
+import { body, query } from 'express-validator';
 import { authenticate } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
-import { listBookmarks, listUserPosts } from '../controllers/profileController.js';
+import { listBookmarks, listUserPosts, editProfile } from '../controllers/profileController.js';
+import multer from 'multer';
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
 
@@ -28,6 +31,18 @@ router.get(
   ],
   validateRequest,
   listUserPosts
+);
+
+router.post(
+  '/edit',
+  upload.single("avatar"),
+  authenticate,
+  [
+    body('displayName').optional().isString().isLength({ max: 100 }),
+    body('bio').optional().isString().isLength({ max: 1000 })
+  ],
+  validateRequest,
+  editProfile
 );
 
 export default router;

@@ -6,6 +6,7 @@ import { verifyToken } from '../utils/jwt.js';
  * Returns 401 if token is missing or invalid
  */
 export function authenticate(req, res, next) {
+  // console.log('[DEBUG] authenticate middleware called');
   try {
     const authHeader = req.headers['authorization'];
     
