@@ -57,6 +57,12 @@ npm run dev
 - Reactions & bookmarks
   - `POST /user-action/user-action` — unified mutations for reactions or bookmarks. Body: `{ action: "reaction" | "bookmark", postId, newReaction?, newBookmark? }` (auth required).
   - `GET /user-action/bookmarks` — list current user's bookmarks.
+- Profile
+  - `GET /profile/:userId/bookmarks` — list bookmarked posts for a user (paginated); includes per-type reactions and viewer-specific actions.
+  - `GET /profile/:userId/posts` — list posts created by a user (paginated); includes per-type reactions and viewer-specific actions.
+  - `POST /profile/edit` — update display name and bio (auth required); avatar upload to be implemented.
+- Search
+  - `GET /search?query=...` — search posts by title (case-insensitive); includes per-type reactions and viewer-specific actions.
 
 ### Data / Prisma notes
 - Schema lives in `prisma/schema.prisma`; generated client is used across controllers.

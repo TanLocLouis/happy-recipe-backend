@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Happy Food API
-  version: 1.1.0
-  description: Auth, posts, bookmarks, reactions, and comments for Happy Food backend
+  version: 1.2.0
+  description: Auth, posts, bookmarks, reactions, comments, profile management, and search for Happy Food backend
 servers:
   - url: http://localhost:4000
     description: Local server
@@ -16,6 +16,8 @@ tags:
   - name: Posts
   - name: Comments
   - name: UserActions
+  - name: Profile
+  - name: Search
 
 paths:
   /health:
@@ -443,6 +445,140 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /api/profile/{userId}/bookmarks:
+    get:
+      tags: [Profile]
+      summary: List bookmarked posts for a user (paginated)
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+          description: User ID to get bookmarks for
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Bookmarked posts with reactions and user actions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookmarkedPosts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostStructure'
+
+  /api/profile/{userId}/posts:
+    get:
+      tags: [Profile]
+      summary: List posts created by a user (paginated)
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+          description: User ID to get posts for
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: User's posts with reactions and viewer-specific actions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userPosts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostStructure'
+
+  /api/profile/edit:
+    post:
+      tags: [Profile]
+      summary: Update user profile (display name and bio)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditProfileRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile:
+                    $ref: '#/components/schemas/ProfileResponse'
+        '400':
+          description: No changes provided or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/search:
+    get:
+      tags: [Search]
+      summary: Search posts by title (case-insensitive)
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema:
+            type: string
+            maxLength: 255
+          description: Search query string
+      responses:
+        '200':
+          description: Search results with reactions and viewer-specific actions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  searchResults:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostStructure'
+        '400':
+          description: Missing or invalid query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -856,3 +992,80 @@ components:
         message:
           type: string
           example: Invalid request
+
+    PostStructure:
+      type: object
+      description: Unified post structure with per-type reactions and viewer-specific actions
+      properties:
+        postId:
+          type: string
+        title:
+          type: string
+        coverImgUrl:
+          type: string
+          nullable: true
+        authorID:
+          type: string
+        authorName:
+          type: string
+          nullable: true
+        cookTime:
+          type: integer
+          nullable: true
+        servings:
+          type: integer
+          nullable: true
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+          nullable: true
+        reactions:
+          type: object
+          description: Per-type reaction counts
+          properties:
+            like:
+              type: integer
+            heart:
+              type: integer
+            yum:
+              type: integer
+        userActions:
+          type: object
+          description: Viewer-specific actions (requires authentication)
+          properties:
+            userReaction:
+              type: string
+              nullable: true
+              enum: [like, heart, yum, null]
+              description: User's reaction type or null if no reaction
+            userBookmark:
+              type: boolean
+              description: Whether the user has bookmarked this post
+
+    EditProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          maxLength: 100
+        bio:
+          type: string
+          maxLength: 1000
+
+    ProfileResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
