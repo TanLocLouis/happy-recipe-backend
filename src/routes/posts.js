@@ -1,16 +1,26 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { createPost, getPostByID, listPosts, getLatestPosts, discoverPosts, getPostComments } from '../controllers/postsController.js';
+import { createPost, createPostWithUpload, getPostByID, listPosts, getLatestPosts, discoverPosts, getPostComments } from '../controllers/postsController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { authenticate, optionalAuthenticate } from '../middleware/authenticate.js';
+import { uploadPostImages } from '../middleware/upload.js';
 import path from 'path';
 import cors from 'cors';
 
 const router = Router();
 
+// New endpoint for file upload with multipart/form-data
 router.post(
   '/',
   authenticate, // Require authentication
+  uploadPostImages, // Handle file uploads
+  createPostWithUpload
+);
+
+// Legacy endpoint for JSON-only post creation (kept for backward compatibility)
+router.post(
+  '/json',
+  authenticate,
   [
     body('title').isString().isLength({ min: 1, max: 255 }),
     body('description').optional().isString(),
@@ -86,7 +96,7 @@ router.get("/files/:filename", cors(), (req, res) => {
   const filename = req.params.filename;
   const filePath = path.resolve("uploads", filename);
 
-  res.setHeader("Content-Type", "image/jpeg");
+  // Let Express infer the correct Content-Type based on extension
   return res.sendFile(filePath);
   // return res.status(200).json( { coverImageUrl: filePath } )
 });

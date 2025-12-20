@@ -6,7 +6,7 @@ import { searchPosts } from '../controllers/searchController.js';
 const router = Router();
 
 router.get(
-  '/',
+  '/results',
   [
     query('query').trim().notEmpty().withMessage('Search query is required').isLength({ max: 255 })
   ],

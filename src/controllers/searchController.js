@@ -79,7 +79,7 @@ export async function searchPosts(req, res) {
       return {
         postId: p.post_id,
         title: p.title,
-        coverImgUrl: p.cover_image_url || null,
+        coverImgUrl: process.env.SERVER_URL + p.cover_image_url || null,
         authorID: p.user_id,
         authorName: author ? (author.display_name || author.username || null) : null,
         cookTime: p.cook_time ?? null,
