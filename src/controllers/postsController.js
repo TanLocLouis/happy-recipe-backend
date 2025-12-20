@@ -1,5 +1,6 @@
 import prisma from '../config/prisma.js';
 import { randomBytes } from 'crypto';
+import path from 'path';
 
 function generatePostId() {
   return randomBytes(4).toString('hex'); // 8 hex chars -> fits `char(8)`
@@ -32,7 +33,7 @@ function mapPost(post) {
     cookTime: post.cook_time,
     servings: post.servings,
     difficulty: post.difficulty,
-    coverImageUrl: post.cover_image_url,
+    coverImageUrl: process.env.SERVER_URL + post.cover_image_url,
     createdAt: post.created_at,
     updatedAt: post.updated_at,
     isDeleted: post.is_deleted,
@@ -41,6 +42,145 @@ function mapPost(post) {
     ingredients: Array.isArray(post.ingredients) ? post.ingredients.map(mapIngredient) : [],
     steps: Array.isArray(post.steps) ? post.steps.map(mapStep) : []
   };
+}
+
+// New controller for handling post creation with file uploads
+export async function createPostWithUpload(req, res) {
+  // console.log('[DEBUG] createPostWithUpload called');
+  // console.log('[DEBUG] req.body:', req.body);
+  // console.log('[DEBUG] req.files:', req.files);
+  const userId = req.userId;
+  
+  try {
+    // Parse the JSON fields from form-data
+    const {
+      title,
+      description,
+      cookTime,
+      servings,
+      difficulty,
+      steps: stepsData
+    } = req.body;
+
+    if (!title) return res.status(400).json({ message: 'title is required' });
+
+    // Normalize files array (multer.any())
+    const files = Array.isArray(req.files) ? req.files : [];
+    // console.log('[DEBUG] Number of files received:', files.length);
+    // console.log('[DEBUG] Files details:', files.map(f => ({ 
+    //   fieldname: f.fieldname, 
+    //   filename: f.filename, 
+    //   originalname: f.originalname,
+    //   mimetype: f.mimetype,
+    //   size: f.size 
+    // })));
+
+    // Handle cover image
+    let coverImageUrl = null;
+    const coverFile = files.find(f => f.fieldname === 'coverImgFile');
+    if (coverFile) {
+      coverImageUrl = `/api/posts/files/${coverFile.filename}`;
+    }
+
+    // Parse steps - handle both JSON array and individual form fields
+    let steps = [];
+    
+    if (Array.isArray(stepsData)) {
+      // Frontend sent steps as JSON array
+      steps = stepsData
+        .filter(s => s.stepDesc && s.stepDesc.trim())
+        .map((s, idx) => {
+          // Find matching step image by index
+          const stepImageFile = files.find(f => 
+            f.fieldname === `stepImgFiles[${idx}]` || 
+            f.fieldname === `steps[${idx}][stepImgFile]`
+          );
+          
+          return {
+            step_number: typeof s.stepNum === 'number' ? s.stepNum : idx + 1,
+            step_description: s.stepDesc,
+            image_url: stepImageFile ? `/api/posts/files/${stepImageFile.filename}` : null
+          };
+        });
+    } else {
+      // Fallback: parse from indexed form fields
+      const stepsMap = new Map();
+      
+      for (const key in req.body) {
+        const match = key.match(/^steps\[(\d+)\]\[(\w+)\]$/);
+        if (match) {
+          const index = parseInt(match[1]);
+          const field = match[2];
+          
+          if (!stepsMap.has(index)) {
+            stepsMap.set(index, {});
+          }
+          
+          const step = stepsMap.get(index);
+          if (field === 'stepNum') {
+            step.stepNumber = parseInt(req.body[key]);
+          } else if (field === 'stepDesc') {
+            step.stepDescription = req.body[key];
+          }
+        }
+      }
+
+      // Handle step images for form field format
+      const stepImageFiles = files.filter(f => 
+        /^stepImgFiles(?:\[(\d+)\])?$/.test(f.fieldname) ||
+        /^steps\[(\d+)\]\[stepImgFile\]$/.test(f.fieldname)
+      );
+
+      stepImageFiles.forEach((file) => {
+        let index = null;
+        const m1 = file.fieldname.match(/^stepImgFiles\[(\d+)\]$/);
+        const m2 = file.fieldname.match(/^steps\[(\d+)\]\[stepImgFile\]$/);
+        
+        if (m1) index = parseInt(m1[1]);
+        else if (m2) index = parseInt(m2[1]);
+        
+        if (index !== null) {
+          if (!stepsMap.has(index)) stepsMap.set(index, {});
+          stepsMap.get(index).image_url = `/api/posts/files/${file.filename}`;
+        }
+      });
+
+      steps = Array.from(stepsMap.values())
+        .filter(s => s.stepDescription)
+        .map(s => ({
+          step_number: s.stepNumber ?? 0,
+          step_description: s.stepDescription,
+          image_url: s.image_url || null
+        }));
+    }
+
+    console.log('[DEBUG] Parsed steps:', steps);
+    console.log('[DEBUG] Cover image URL:', coverImageUrl);
+
+    const postId = generatePostId();
+
+    const created = await prisma.$transaction(async (tx) => {
+      return await tx.posts.create({
+        data: {
+          post_id: postId,
+          user_id: userId,
+          title,
+          description: description || null,
+          cook_time: cookTime ? parseInt(cookTime) : null,
+          servings: servings ? parseInt(servings) : null,
+          difficulty: difficulty || null,
+          cover_image_url: coverImageUrl,
+          steps: steps.length > 0 ? { create: steps } : undefined
+        }
+      });
+    });
+
+    return res.status(201).json({ postId: created.post_id });
+    return res.status(201).json({});
+  } catch (err) {
+    console.error('Error creating post with upload:', err);
+    return res.status(500).json({ message: 'Internal server error', error: err.message });
+  }
 }
 
 export async function createPost(req, res) {
@@ -159,7 +299,7 @@ export async function getPostByID(req, res) {
     const detailedPost = {
       postId: post.post_id,
       title: post.title,
-      coverImgUrl: post.cover_image_url || null,
+      coverImgUrl: process.env.SERVER_URL + post.cover_image_url || null,
       authorId: post.user_id,
       authorName: post.users
         ? (post.users.display_name || post.users.username || null)
@@ -218,7 +358,7 @@ export async function listPosts(req, res) {
       cookTime: r.cook_time,
       servings: r.servings,
       difficulty: r.difficulty,
-      coverImageUrl: r.cover_image_url,
+      coverImageUrl: process.env.SERVER_URL + r.cover_image_url,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
       isDeleted: r.is_deleted,
@@ -302,7 +442,7 @@ export async function discoverPosts(req, res) {
       return {
         postId: pid,
         title: r.title,
-        coverImgUrl: r.cover_image_url || null,
+        coverImgUrl: process.env.SERVER_URL + r.cover_image_url || null,
         authorId: r.user_id,
         authorName: author ? (author.display_name || author.username || null) : null,
         cookTime: r.cook_time ?? null,
@@ -360,7 +500,7 @@ export async function getLatestPosts(req, res) {
         cookTime: r.cook_time,
         servings: r.servings,
         difficulty: r.difficulty,
-        coverImageUrl: r.cover_image_url,
+        coverImageUrl: process.env.SERVER_URL + r.cover_image_url,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
         isDeleted: r.is_deleted,

@@ -68,7 +68,7 @@ export async function getAllPosts(req, res) {
       cookTime: post.cook_time,
       servings: post.servings,
       difficulty: post.difficulty,
-      coverImageUrl: post.cover_image_url,
+      coverImageUrl: process.env.SERVER_URL + post.cover_image_url,
       createdAt: post.created_at,
       updatedAt: post.updated_at,
       isDeleted: post.is_deleted,

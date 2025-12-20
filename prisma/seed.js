@@ -78,7 +78,8 @@ async function main() {
       const ingCount = randInt(2, 6);
       const ingredients = [];
       for (let i = 0; i < ingCount; i++) {
-        ingredients.push({ item_order: i + 1, ingredient_text: pick(ingredientsPool), ingredient_unit: `${randInt(1, 500)}g` });
+        // ingredients.push({ item_order: i + 1, ingredient_text: pick(ingredientsPool), ingredient_unit: `${randInt(1, 500)}g` });
+        ingredients.push({ item_order: i + 1, ingredient_text: pick(ingredientsPool)});
       }
 
       // steps
@@ -97,7 +98,7 @@ async function main() {
           cook_time,
           servings,
           difficulty,
-          cover_image_url: 'http://localhost:4000/api/posts/files/sample.jpg',
+          cover_image_url: '/api/posts/files/sample.jpg',
           ingredients: { create: ingredients },
           steps: { create: steps }
         }
