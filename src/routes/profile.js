@@ -3,9 +3,9 @@ import { body, query } from 'express-validator';
 import { authenticate } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { listBookmarks, listUserPosts, editProfile } from '../controllers/profileController.js';
-import multer from 'multer';
-
-const upload = multer({ storage: multer.memoryStorage() });
+import { uploadProfileAvatar } from '../middleware/profileUpload.js';
+import path from 'path';
+import cors from 'cors';
 
 const router = Router();
 
@@ -35,14 +35,22 @@ router.get(
 
 router.post(
   '/edit',
-  upload.single("avatar"),
   authenticate,
-  [
-    body('displayName').optional().isString().isLength({ max: 100 }),
-    body('bio').optional().isString().isLength({ max: 1000 })
-  ],
-  validateRequest,
+  uploadProfileAvatar,
+  // [
+  //   body('displayName').optional().isString().isLength({ max: 100 }),
+  //   body('bio').optional().isString().isLength({ max: 1000 })
+  // ],
+  // validateRequest,
   editProfile
 );
+
+// Serve profile images
+router.get("/files/:filename", cors(), (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.resolve("uploads", filename);
+
+  return res.sendFile(filePath);
+});
 
 export default router;
