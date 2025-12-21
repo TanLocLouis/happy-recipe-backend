@@ -184,6 +184,7 @@ export async function editProfile(req, res) {
   console.log('[DEBUG] editProfile called');
   try {
     const userId = req.userId;
+    console.log('[DEBUG] Authenticated userId:', userId);
     
     if (!userId) {
       return res.status(401).json({ message: 'Unauthorized: user not authenticated' });
@@ -197,6 +198,13 @@ export async function editProfile(req, res) {
     }
     if (bio !== undefined && bio !== null && bio.trim() !== '') {
       data.bio = bio.trim();
+    }
+
+    // Handle avatar file upload
+    if (req.file) {
+      const avatarUrl = `/api/profile/files/${req.file.filename}`;
+      console.log('[DEBUG] New avatar uploaded:', avatarUrl);
+      data.profile_image_url = avatarUrl;
     }
 
     if (Object.keys(data).length === 0) {
@@ -221,7 +229,7 @@ export async function editProfile(req, res) {
         username: updated.username,
         displayName: updated.display_name,
         bio: updated.bio,
-        avatarUrl: updated.profile_image_url || null
+        avatarUrl: process.env.SERVER_URL + updated.profile_image_url || null
       }
     });
   } catch (err) {
