@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import prisma from '../src/config/prisma.js';
 import { hashPassword } from '../src/utils/password.js';
+import { profile } from 'console';
 
 // Compatibility: if client hasn't been generated with `bookmarks` yet,
 // fall back to `favorites` to avoid runtime errors during seeding.
@@ -21,7 +22,7 @@ async function main() {
 
   // Base users (kept deterministic-ish) + generate extras
   const baseUsers = [
-    { username: 'alice', email: '23120057@student.hcmus.edu.vn', display_name: 'Alice', password: 'password123' },
+    { username: 'alice', email: '23120057@student.hcmus.edu.vn', display_name: 'Alice', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg' },
     { username: 'bob', email: 'bob@example.com', display_name: 'Bob', password: 'password123' },
     { username: 'carol', email: 'carol@example.com', display_name: 'Carol', password: 'password123' }
   ];
@@ -47,6 +48,7 @@ async function main() {
         username: u.username,
         email: u.email,
         password_hash: pwHash,
+        profile_image_url: u.profile_image_url || null,
         display_name: u.display_name
       }
     });

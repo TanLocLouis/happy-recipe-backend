@@ -203,7 +203,7 @@ export async function getUserInfo(req, res) {
       displayName: user.display_name || null,
       email: user.email,
       bio: user.bio || null,
-      profileImageUrl: user.profile_image_url || null,
+      profileImageUrl: user.profile_image_url ? process.env.SERVER_URL + user.profile_image_url : null,
       isVerified: user.is_verified || false,
     };
     return res.status(200).json(userInfo);

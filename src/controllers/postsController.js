@@ -19,7 +19,8 @@ function mapStep(st) {
   if (!st) return null;
   return {
     stepNum: st.step_number,
-    stepDesc: st.step_description
+    stepDesc: st.step_description,
+    stepImgUrl: st.image_url ? st.image_url : null
   };
 }
 
@@ -40,7 +41,7 @@ function mapPost(post) {
     deletedAt: post.deleted_at,
     deletedBy: post.deleted_by,
     ingredients: Array.isArray(post.ingredients) ? post.ingredients.map(mapIngredient) : [],
-    steps: Array.isArray(post.steps) ? post.steps.map(mapStep) : []
+    steps: Array.isArray(post.steps) ? process.env.SERVER_URL + post.steps.map(mapStep) : []
   };
 }
 
