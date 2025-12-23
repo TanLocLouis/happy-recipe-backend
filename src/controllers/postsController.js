@@ -20,7 +20,7 @@ function mapStep(st) {
   return {
     stepNum: st.step_number,
     stepDesc: st.step_description,
-    stepImgUrl: st.image_url ? st.image_url : null
+    stepImgUrl: st.image_url ? process.env.SERVER_URL + st.image_url : null
   };
 }
 
@@ -41,7 +41,7 @@ function mapPost(post) {
     deletedAt: post.deleted_at,
     deletedBy: post.deleted_by,
     ingredients: Array.isArray(post.ingredients) ? post.ingredients.map(mapIngredient) : [],
-    steps: Array.isArray(post.steps) ? process.env.SERVER_URL + post.steps.map(mapStep) : []
+    steps: Array.isArray(post.steps) ? post.steps.map(mapStep) : []
   };
 }
 
@@ -392,7 +392,7 @@ export async function discoverPosts(req, res) {
         servings: true,
         difficulty: true,
         cover_image_url: true,
-        users: { select: { user_id: true, username: true, display_name: true } }
+        users: { select: { user_id: true, username: true, display_name: true, profile_image_url: true } }
       },
       orderBy: { created_at: 'desc' },
       take: limit,
@@ -446,6 +446,9 @@ export async function discoverPosts(req, res) {
         coverImgUrl: process.env.SERVER_URL + r.cover_image_url || null,
         authorId: r.user_id,
         authorName: author ? (author.display_name || author.username || null) : null,
+        authorImgUrl: author && author.profile_image_url
+          ? process.env.SERVER_URL + author.profile_image_url
+          : null,
         cookTime: r.cook_time ?? null,
         servings: r.servings ?? null,
         difficulty: r.difficulty || null,
