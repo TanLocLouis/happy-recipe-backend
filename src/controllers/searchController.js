@@ -4,6 +4,7 @@ export async function searchPosts(req, res) {
   console.log('[DEBUG] searchPosts called');
   try {
     const searchQuery = req.query.query?.trim() || '';
+    console.log('[DEBUG] searchQuery:', searchQuery);
     const viewerUserId = req.userId || null;
 
     if (!searchQuery) {
@@ -71,7 +72,7 @@ export async function searchPosts(req, res) {
       countsMap.set(g.post_id, entry);
     }
 
-    const searchResults = posts.map(p => {
+    const data = posts.map(p => {
       const author = p.users || null;
       const userReaction = p.reactions && p.reactions.length > 0 ? p.reactions[0].reaction_type : null;
       const userBookmark = p.bookmarks ? p.bookmarks.length > 0 : false;
@@ -93,7 +94,7 @@ export async function searchPosts(req, res) {
       };
     });
 
-    return res.status(200).json({ searchResults });
+    return res.status(200).json({ data });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });

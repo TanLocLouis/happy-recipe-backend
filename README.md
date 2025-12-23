@@ -15,6 +15,9 @@ DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
+```
+- No need to change this on local team dev
+```
 DB_NAME=happy_recipe
 JWT_SECRET=supersecret_change_me
 JWT_EXPIRES_IN=7d
@@ -25,9 +28,13 @@ VITE_MAILTOKEN=your_gmail_app_password
 ```
 npm install
 ```
-3) Initialize DB schema (runs `database/happy_recipe.sql`)
+3) Initialize DB schema 
+- Push current DB schema to DB server (MySQL, etc)
 ```
 npx prisma db push
+```
+- Generate Prisma client
+```
 npx prisma generate
 ```
 4) Seed sample data (users, posts, comments, reactions, bookmarks)

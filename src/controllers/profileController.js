@@ -2,9 +2,10 @@ import prisma from '../config/prisma.js';
 
 export async function listBookmarks(req, res) {
   console.log('[DEBUG] listBookmarks called');
+  console.log('[DEBUG] Query params:', req.params);
   try {
     // userId is available from authenticate middleware
-    const userId = req.userId;
+    const { userId }= req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
@@ -27,7 +28,7 @@ export async function listBookmarks(req, res) {
             is_deleted: true,
             deleted_at: true,
             deleted_by: true,
-            users: { select: { user_id: true, username: true, display_name: true } },
+            users: { select: { user_id: true, username: true, display_name: true, profile_image_url: true } },
             _count: {
               select: {
                 reactions: true,
@@ -61,8 +62,9 @@ export async function listBookmarks(req, res) {
           postId: p.post_id,
           title: p.title,
           coverImgUrl: process.env.SERVER_URL + p.cover_image_url || null,
-          authorID: p.user_id,
+          authorId: p.user_id,
           authorName: author ? (author.display_name || author.username || null) : null,
+          authorImgUrl: author && author.profile_image_url ? (process.env.SERVER_URL + author.profile_image_url) : null,
           cookTime: p.cook_time ?? null,
           servings: p.servings ?? null,
           difficulty: p.difficulty || null,
@@ -103,7 +105,7 @@ export async function listUserPosts(req, res) {
       difficulty: true,
       cover_image_url: true,
       created_at: true,
-      users: { select: { user_id: true, username: true, display_name: true } }
+      users: { select: { user_id: true, username: true, display_name: true, profile_image_url: true } }
     };
 
     if (viewerUserId) {
@@ -160,8 +162,9 @@ export async function listUserPosts(req, res) {
         postId: p.post_id,
         title: p.title,
         coverImgUrl: process.env.SERVER_URL + p.cover_image_url || null,
-        authorID: p.user_id,
+        authorId: p.user_id,
         authorName: author ? (author.display_name || author.username || null) : null,
+        authorImgUrl: author && author.profile_image_url ? (process.env.SERVER_URL + author.profile_image_url) : null,
         cookTime: p.cook_time ?? null,
         servings: p.servings ?? null,
         difficulty: p.difficulty || null,
