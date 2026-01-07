@@ -3,12 +3,66 @@ import prisma from '../config/prisma.js';
 export async function searchPosts(req, res) {
   console.log('[DEBUG] searchPosts called');
   try {
+    const category = req.query.category?.trim() || 'post';
     const searchQuery = req.query.query?.trim() || '';
-    console.log('[DEBUG] searchQuery:', searchQuery);
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = 20; // Results per page
+    const skip = (page - 1) * pageSize;
+
+    console.log('[DEBUG] category:', category, 'searchQuery:', searchQuery, 'page:', page);
     const viewerUserId = req.userId || null;
 
     if (!searchQuery) {
       return res.status(400).json({ message: 'Search query is required' });
+    }
+
+    if (!['user', 'post'].includes(category)) {
+      return res.status(400).json({ message: 'Category must be either "user" or "post"' });
+    }
+
+    // Handle user search
+    if (category === 'user') {
+      const users = await prisma.users.findMany({
+        where: {
+          is_active: true,
+          OR: [
+            { username: { contains: searchQuery } },
+            { display_name: { contains: searchQuery } },
+            { email: { contains: searchQuery } }
+          ]
+        },
+        select: {
+          user_id: true,
+          username: true,
+          display_name: true,
+          email: true,
+          bio: true,
+          profile_image_url: true,
+          is_verified: true
+        },
+        skip,
+        take: pageSize,
+        orderBy: { created_at: 'desc' }
+      });
+
+      const data = users.map(user => ({
+        userId: user.user_id,
+        username: user.username || null,
+        displayName: user.display_name || null,
+        email: user.email,
+        bio: user.bio || null,
+        userImgUrl: user.profile_image_url ? process.env.SERVER_URL + user.profile_image_url : null,
+        isVerified: user.is_verified || false
+      }));
+
+      return res.status(200).json({ 
+        data,
+        pagination: {
+          page,
+          pageSize,
+          hasMore: data.length === pageSize
+        }
+      });
     }
 
     // Search posts by title (case-insensitive)
@@ -45,6 +99,8 @@ export async function searchPosts(req, res) {
         }
       },
       select: postSelect,
+      skip,
+      take: pageSize,
       orderBy: { created_at: 'desc' }
     });
 
@@ -94,7 +150,14 @@ export async function searchPosts(req, res) {
       };
     });
 
-    return res.status(200).json({ data });
+    return res.status(200).json({ 
+      data,
+      pagination: {
+        page,
+        pageSize,
+        hasMore: data.length === pageSize
+      }
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
