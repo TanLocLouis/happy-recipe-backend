@@ -8,7 +8,9 @@ const router = Router();
 router.get(
   '/results',
   [
-    query('query').trim().notEmpty().withMessage('Search query is required').isLength({ max: 255 })
+    query('category').trim().notEmpty().isIn(['user', 'post']).withMessage('Category must be either "user" or "post"'),
+    query('query').trim().notEmpty().withMessage('Search query is required').isLength({ max: 255 }),
+    query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer')
   ],
   validateRequest,
   searchPosts

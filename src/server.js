@@ -8,6 +8,8 @@ import userActionRoutes from './routes/userAction.js';
 import moderatorRoutes from './routes/moderator.js';
 import profileRoutes from './routes/profile.js';
 import searchRoutes from './routes/search.js';
+import usersRoute from './routes/users.js';
+import aiRoutes from './routes/ai.js';
 import { testConnection } from './config/db.js';
 
 const app = express();
@@ -43,6 +45,8 @@ app.use('/api/user-action', userActionRoutes);
 app.use('/api/moderator', moderatorRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/users', usersRoute);
+app.use('/api/ai', aiRoutes);
 
 app.use((req, res, next) => {
   res.status(404).json({ message: 'Not found' });

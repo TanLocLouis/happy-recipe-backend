@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Happy Food API
-  version: 1.3.0
-  description: Auth, posts, bookmarks, reactions, comments, profile management, moderation, and search for Happy Food backend
+  version: 1.4.0
+  description: Auth, posts, bookmarks, reactions, comments, profile management, moderation, search, users, and AI chat for Happy Food backend
 servers:
   - url: http://localhost:4000
     description: Local server
@@ -17,7 +17,9 @@ tags:
   - name: Comments
   - name: UserActions
   - name: Profile
+  - name: Users
   - name: Search
+  - name: AI
   - name: Moderator
 
 paths:
@@ -597,8 +599,15 @@ paths:
   /api/search/results:
     get:
       tags: [Search]
-      summary: Search posts by title (case-insensitive)
+      summary: Search users or posts with pagination
       parameters:
+        - in: query
+          name: category
+          required: true
+          schema:
+            type: string
+            enum: [user, post]
+          description: Category to search in (user or post)
         - in: query
           name: query
           required: true
@@ -606,24 +615,206 @@ paths:
             type: string
             maxLength: 255
           description: Search query string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number for pagination
       responses:
         '200':
-          description: Search results with reactions and viewer-specific actions
+          description: Search results with pagination
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  searchResults:
+                  data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/PostStructure'
+                      oneOf:
+                        - $ref: '#/components/schemas/PostStructure'
+                        - $ref: '#/components/schemas/UserInfo'
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      pageSize:
+                        type: integer
+                      hasMore:
+                        type: boolean
         '400':
-          description: Missing or invalid query parameter
+          description: Missing or invalid query parameters
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /api/users/{user_id}:
+    get:
+      tags: [Users]
+      summary: Get user profile information by user ID
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID to retrieve profile for
+      responses:
+        '200':
+          description: User profile information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '400':
+          description: Missing userId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Account is disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/ai/chat:
+    post:
+      tags: [AI]
+      summary: Chat with OpenAI assistant for recipe search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [chatList]
+              properties:
+                chatList:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, assistant]
+                      content:
+                        type: string
+                  description: Chat history (max 10 recent messages)
+      responses:
+        '200':
+          description: AI response with recipe suggestions
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      title:
+                        type: string
+                      description:
+                        type: string
+                      url:
+                        type: string
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+        '400':
+          description: Invalid request or chat history exceeds limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: AI service error or invalid response format
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  raw:
+                    type: string
+
+  /api/ai/chat-gemini:
+    post:
+      tags: [AI]
+      summary: Chat with Gemini assistant for recipe search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [chatList]
+              properties:
+                chatList:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, assistant]
+                      content:
+                        type: string
+                  description: Chat history (max 10 recent messages)
+      responses:
+        '200':
+          description: AI response with recipe suggestions
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      title:
+                        type: string
+                      description:
+                        type: string
+                      url:
+                        type: string
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: AI service error or invalid response format
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  raw:
+                    type: string
 
   /api/moderator/posts:
     get:
