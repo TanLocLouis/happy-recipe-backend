@@ -9,6 +9,7 @@ import {
   discoverPosts,
   getPostComments,
   createPostComment,
+  getRelatedPosts,
 } from "../controllers/postsController.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { authenticate, optionalAuthenticate } from "../middleware/authenticate.js";
@@ -120,5 +121,27 @@ router.get("/files/:filename", cors(), (req, res) => {
   return res.sendFile(filePath);
   // return res.status(200).json( { coverImageUrl: filePath } )
 });
+
+router.get(
+  "/all",
+  [
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 100 }),
+    query("offset").optional().isInt({ min: 0 }),
+  ],
+  validateRequest,
+  listPosts
+);
+
+router.get(
+  "/related/:id",
+  [
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 100 }),
+    query("offset").optional().isInt({ min: 0 }),
+  ],
+  validateRequest,
+  getRelatedPosts 
+)
 
 export default router;

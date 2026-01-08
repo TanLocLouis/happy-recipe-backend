@@ -1,6 +1,8 @@
 import prisma from "../config/prisma.js";
 import { randomBytes } from "crypto";
 import path from "path";
+import { cosineSimilarity, extractFeatures } from "../utils/embedVector.js";
+import { json } from "stream/consumers";
 
 function generatePostId() {
   return randomBytes(4).toString("hex"); // 8 hex chars -> fits `char(8)`
@@ -47,6 +49,11 @@ function mapPost(post) {
 
 // New controller for handling post creation with file uploads
 export async function createPostWithUpload(req, res) {
+  const embedded_content_value = await extractFeatures(req.body.title + req.body.description);
+  const embedded_content = JSON.stringify(embedded_content_value);
+  console.log("[DEBUG] createPost called with embedded_content:", embedded_content);
+
+
   // console.log('[DEBUG] createPostWithUpload called');
   // console.log('[DEBUG] req.body:', req.body);
   // console.log('[DEBUG] req.files:', req.files);
@@ -165,6 +172,7 @@ export async function createPostWithUpload(req, res) {
           servings: servings ? parseInt(servings) : null,
           difficulty: difficulty || null,
           cover_image_url: coverImageUrl,
+          embedded_content: embedded_content || null,
           steps: steps.length > 0 ? { create: steps } : undefined,
         },
       });
@@ -650,6 +658,83 @@ export async function createPostComment(req, res) {
     console.log("[DEBUG] Created comment:", created);
 
     return res.status(201).json({ commentId: String(created.comment_id) });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function getRelatedPosts(req, res) {
+  console.log("[DEBUG] getRelatedPosts called");
+  console.log("[DEBUG] req.query:", req.params);
+
+  const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || "20", 10), 1), 100);
+  const offset = (page - 1) * limit;
+
+  const { id } = req.params; // postId
+
+  try {
+    const rows = await prisma.posts.findMany({
+      where: { is_deleted: false },
+      select: {
+        post_id: true,
+        user_id: true,
+        title: true,
+        description: true,
+        cook_time: true,
+        servings: true,
+        difficulty: true,
+        cover_image_url: true,
+        embedded_content: true,
+        created_at: true,
+        updated_at: true,
+        is_deleted: true,
+        deleted_at: true,
+        deleted_by: true,
+      },
+      orderBy: { created_at: "desc" },
+      take: limit,
+      skip: offset,
+    });
+
+
+    const targetPost = rows.find(p => p.post_id.slice(0, 8) === id);
+    const targetPostEmbedding = targetPost && targetPost.embedded_content ? JSON.parse(targetPost.embedded_content) : null;
+
+    if (!targetPostEmbedding) {
+      return res.status(400).json({ message: "Target post does not have embedding data" });
+    }
+
+    // Compute similarity scores
+    const postsWithSimilarity = rows
+      .filter(p => p.post_id.slice(0, 8) !== id && p.embedded_content) // Exclude target post and those without embeddings
+      .map(p => {
+        const embedding = JSON.parse(p.embedded_content);
+        const similarity = cosineSimilarity(targetPostEmbedding, embedding);
+        return { post: p, similarity };
+      });
+
+    // Sort by similarity descending
+    postsWithSimilarity.sort((a, b) => b.similarity - a.similarity);
+    const topPosts = postsWithSimilarity.slice(0, limit).map(ps => ps.post);
+
+    const posts = topPosts.map((r) => ({
+      postId: r.post_id,
+      userId: r.user_id,
+      title: r.title,
+      description: r.description,
+      cookTime: r.cook_time,
+      servings: r.servings,
+      difficulty: r.difficulty,
+      coverImageUrl: process.env.SERVER_URL + r.cover_image_url,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      isDeleted: r.is_deleted,
+      deletedAt: r.deleted_at,
+      deletedBy: r.deleted_by,
+    }));
+    return res.status(200).json({ posts });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Internal server error" });
