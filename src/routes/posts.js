@@ -1,17 +1,26 @@
-import { Router } from 'express';
-import { body, param, query } from 'express-validator';
-import { createPost, createPostWithUpload, getPostByID, listPosts, getLatestPosts, discoverPosts, getPostComments } from '../controllers/postsController.js';
-import { validateRequest } from '../middleware/validateRequest.js';
-import { authenticate, optionalAuthenticate } from '../middleware/authenticate.js';
-import { uploadPostImages } from '../middleware/upload.js';
-import path from 'path';
-import cors from 'cors';
+import { Router } from "express";
+import { body, param, query } from "express-validator";
+import {
+  createPost,
+  createPostWithUpload,
+  getPostByID,
+  listPosts,
+  getLatestPosts,
+  discoverPosts,
+  getPostComments,
+  createPostComment,
+} from "../controllers/postsController.js";
+import { validateRequest } from "../middleware/validateRequest.js";
+import { authenticate, optionalAuthenticate } from "../middleware/authenticate.js";
+import { uploadPostImages } from "../middleware/upload.js";
+import path from "path";
+import cors from "cors";
 
 const router = Router();
 
 // New endpoint for file upload with multipart/form-data
 router.post(
-  '/',
+  "/",
   authenticate, // Require authentication
   uploadPostImages, // Handle file uploads
   createPostWithUpload
@@ -19,76 +28,87 @@ router.post(
 
 // Legacy endpoint for JSON-only post creation (kept for backward compatibility)
 router.post(
-  '/json',
+  "/json",
   authenticate,
   [
-    body('title').isString().isLength({ min: 1, max: 255 }),
-    body('description').optional().isString(),
-    body('cookTime').optional().isInt({ min: 0 }),
-    body('servings').optional().isInt({ min: 1 }),
-    body('difficulty').optional().isIn(['easy', 'medium', 'hard']),
-    body('coverImageUrl').optional().isString(),
-    body('ingredients').optional().isArray(),
-    body('steps').optional().isArray()
+    body("title").isString().isLength({ min: 1, max: 255 }),
+    body("description").optional().isString(),
+    body("cookTime").optional().isInt({ min: 0 }),
+    body("servings").optional().isInt({ min: 1 }),
+    body("difficulty").optional().isIn(["easy", "medium", "hard"]),
+    body("coverImageUrl").optional().isString(),
+    body("ingredients").optional().isArray(),
+    body("steps").optional().isArray(),
   ],
   validateRequest,
   createPost
 );
 
 router.get(
-  '/all',
+  "/all",
   [
-    query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 100 }),
-    query('offset').optional().isInt({ min: 0 })
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 100 }),
+    query("offset").optional().isInt({ min: 0 }),
   ],
   validateRequest,
   listPosts
 );
 
 router.get(
-  '/discover',
+  "/discover",
   optionalAuthenticate, // Optional authentication for user-specific actions
   [
-    query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 100 }),
-    query('offset').optional().isInt({ min: 0 })
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 100 }),
+    query("offset").optional().isInt({ min: 0 }),
   ],
   validateRequest,
-  discoverPosts 
+  discoverPosts
 );
 
 router.get(
-  '/latest',
+  "/latest",
   [
-    query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 100 }),
-    query('offset').optional().isInt({ min: 0 }),
-    query('details').optional().isBoolean()
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 100 }),
+    query("offset").optional().isInt({ min: 0 }),
+    query("details").optional().isBoolean(),
   ],
   validateRequest,
   getLatestPosts
 );
 
 router.get(
-  '/:id',
+  "/:id",
   optionalAuthenticate, // Optional authentication for user-specific actions
-  [param('id').isString().isLength({ min: 1, max: 36 })],
+  [param("id").isString().isLength({ min: 1, max: 36 })],
   validateRequest,
   getPostByID
 );
 
 router.get(
-  '/:id/comments',
+  "/:id/comments",
   optionalAuthenticate,
   [
-    param('id').isString().isLength({ min: 1, max: 36 }),
-    query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 100 }),
-    query('offset').optional().isInt({ min: 0 }),
+    param("id").isString().isLength({ min: 1, max: 36 }),
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 100 }),
+    query("offset").optional().isInt({ min: 0 }),
   ],
   validateRequest,
   getPostComments
+);
+
+router.post(
+  "/:id/comments",
+  authenticate,
+  [
+    param("id").isString().isLength({ min: 1, max: 36 }),
+    body("content").isString().isLength({ min: 1, max: 1000 }),
+  ],
+  validateRequest,
+  createPostComment
 );
 
 // Handle get coverImageUrl separately if needed
