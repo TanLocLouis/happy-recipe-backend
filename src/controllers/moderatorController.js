@@ -1,4 +1,5 @@
 import prisma from '../config/prisma.js';
+import { sendModeratorWarning } from '../services/mailer.js';
 
 /**
  * Get all posts with pagination and filtering (for moderators)
@@ -14,7 +15,8 @@ export async function getAllPosts(req, res) {
   }
   
   // Filter options
-  const includeDeleted = req.query.includeDeleted === 'true';
+  // const includeDeleted = req.query.includeDeleted === 'true';
+  const isDeleted = req.query.isDeleted === 'true';
   const userId = req.query.userId; // Filter by user
   const searchTerm = req.query.search; // Search in title/description
 
@@ -22,8 +24,8 @@ export async function getAllPosts(req, res) {
     // Build where clause
     const where = {};
     
-    if (!includeDeleted) {
-      where.is_deleted = false;
+    if (isDeleted) {
+      where.is_deleted = true;
     }
     
     if (userId) {
@@ -686,6 +688,40 @@ export async function notifyUser(req, res) {
         createdAt: notification.created_at
       }
     });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Notify user about a post (moderator action)
+ */
+export async function notifyUserWarned(req, res) {
+  const { userId } = req.params;
+  const { message } = req.body;
+  const moderatorId = req.userId;
+
+  try {
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      return res.status(400).json({ message: 'Message is required' });
+    }
+
+    const targetUser = await prisma.users.findUnique({
+      where: { user_id: userId },
+      select: { email: true, display_name: true, username: true }
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const friendlyName = targetUser.display_name || targetUser.username || 'người dùng';
+    const emailMessage = `Chào ${friendlyName},\n\n${message.trim()}\n\n(Được gửi bởi moderator).`;
+
+    await sendModeratorWarning(targetUser.email, emailMessage);
+
+    return res.status(200).json({ message: 'Warning email sent successfully' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });

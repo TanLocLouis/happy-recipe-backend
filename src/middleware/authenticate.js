@@ -9,7 +9,7 @@ export function authenticate(req, res, next) {
   // console.log('[DEBUG] authenticate middleware called');
   try {
     const authHeader = req.headers['authorization'];
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ message: 'Missing or invalid authorization header' });
     }

@@ -11,7 +11,8 @@ import {
   warnUser,
   banUser,
   unbanUser,
-  notifyUser
+  notifyUser,
+  notifyUserWarned
 } from '../controllers/moderatorController.js';
 
 import { param, body } from 'express-validator';
@@ -147,6 +148,16 @@ router.post(
   ],
   validateRequest,
   notifyUser
+);
+
+router.post(
+  '/users/:userId/notify-warned',
+  [
+    param('userId').isString().notEmpty(),
+    body('message').isString().trim().isLength({ min: 1, max: 500 })
+  ],
+  validateRequest,
+  notifyUserWarned 
 );
 
 /**
