@@ -133,7 +133,7 @@ export async function requestNewAccessToken(req, res) {
     if (!userId) return res.status(400).json({ message: "Invalid token payload" });
 
     // Issue a new access token (short-lived)
-    const accessToken = signToken({ userId, username: payload.username }, "15m");
+    const accessToken = signToken({ userId, username: payload.username }, "1m");
 
     // For now we reuse the same refresh token. If you want rotation, issue a new
     // refresh token here instead.
@@ -243,7 +243,7 @@ export async function validate2FA(req, res) {
     if (!user || !user.is_active) return res.status(403).json({ message: "Account is disabled" });
 
     const userId = user.user_id;
-    const accessToken = signToken({ userId, username: user.username }, "15m");
+    const accessToken = signToken({ userId, username: user.username }, "1m");
     const refreshToken = signToken({ userId, type: "refresh" });
 
     // delete used 2FA record

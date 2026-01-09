@@ -87,7 +87,6 @@ export async function createPostWithUpload(req, res) {
   const embedded_content = JSON.stringify(embedded_content_value);
   console.log("[DEBUG] createPost called with embedded_content:", embedded_content);
 
-
   // console.log('[DEBUG] createPostWithUpload called');
   // console.log('[DEBUG] req.body:', req.body);
   // console.log('[DEBUG] req.files:', req.files);
@@ -714,6 +713,9 @@ export async function getRelatedPosts(req, res) {
       select: {
         post_id: true,
         user_id: true,
+        users: {
+          select: { user_id: true, display_name: true, profile_image_url: true },
+        },
         title: true,
         description: true,
         cook_time: true,
@@ -732,9 +734,9 @@ export async function getRelatedPosts(req, res) {
       skip: offset,
     });
 
-
-    const targetPost = rows.find(p => p.post_id.slice(0, 8) === id);
-    const targetPostEmbedding = targetPost && targetPost.embedded_content ? JSON.parse(targetPost.embedded_content) : null;
+    const targetPost = rows.find((p) => p.post_id.slice(0, 8) === id);
+    const targetPostEmbedding =
+      targetPost && targetPost.embedded_content ? JSON.parse(targetPost.embedded_content) : null;
 
     if (!targetPostEmbedding) {
       return res.status(400).json({ message: "Target post does not have embedding data" });
@@ -742,8 +744,8 @@ export async function getRelatedPosts(req, res) {
 
     // Compute similarity scores
     const postsWithSimilarity = rows
-      .filter(p => p.post_id.slice(0, 8) !== id && p.embedded_content) // Exclude target post and those without embeddings
-      .map(p => {
+      .filter((p) => p.post_id.slice(0, 8) !== id && p.embedded_content) // Exclude target post and those without embeddings
+      .map((p) => {
         const embedding = JSON.parse(p.embedded_content);
         const similarity = cosineSimilarity(targetPostEmbedding, embedding);
         return { post: p, similarity };
@@ -751,11 +753,16 @@ export async function getRelatedPosts(req, res) {
 
     // Sort by similarity descending
     postsWithSimilarity.sort((a, b) => b.similarity - a.similarity);
-    const topPosts = postsWithSimilarity.slice(0, limit).map(ps => ps.post);
+    const topPosts = postsWithSimilarity.slice(0, limit).map((ps) => ps.post);
 
     const posts = topPosts.map((r) => ({
       postId: r.post_id,
       userId: r.user_id,
+      authorName: r.users ? r.users.display_name || null : null,
+      authorImgUrl:
+        r.users && r.users.profile_image_url
+          ? process.env.SERVER_URL + r.users.profile_image_url
+          : null,
       title: r.title,
       description: r.description,
       cookTime: r.cook_time,
