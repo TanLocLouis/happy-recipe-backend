@@ -47,6 +47,40 @@ function mapPost(post) {
   };
 }
 
+export async function deletePost(req, res) {
+  console.log("[DEBUG] deletePost called");
+  const { id } = req.params;
+  const userId = req.userId;
+
+  try {
+    const post = await prisma.posts.findFirst({
+      where: { post_id: id, is_deleted: false },
+    });
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    if (post.user_id !== userId) {
+      return res.status(403).json({ message: "Forbidden: You can only delete your own posts" });
+    }
+
+    await prisma.posts.update({
+      where: { post_id: id },
+      data: {
+        is_deleted: true,
+        deleted_at: new Date(),
+        deleted_by: userId,
+      },
+    });
+
+    return res.status(200).json({ message: "Post deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting post:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 // New controller for handling post creation with file uploads
 export async function createPostWithUpload(req, res) {
   const embedded_content_value = await extractFeatures(req.body.title + req.body.description);
@@ -627,7 +661,7 @@ export async function getPostComments(req, res) {
 export async function createPostComment(req, res) {
   console.log("[DEBUG] createPostComment called");
   const { id } = req.params; // postId
-  const userId = req.user.userId;
+  const userId = req.userId;
   const { content, parentCommentID } = req.body;
 
   try {

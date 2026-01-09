@@ -10,6 +10,7 @@ import {
   getPostComments,
   createPostComment,
   getRelatedPosts,
+  deletePost,
 } from "../controllers/postsController.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { authenticate, optionalAuthenticate } from "../middleware/authenticate.js";
@@ -18,6 +19,8 @@ import path from "path";
 import cors from "cors";
 
 const router = Router();
+
+router.delete("/:id", authenticate, deletePost);
 
 // New endpoint for file upload with multipart/form-data
 router.post(
@@ -141,7 +144,7 @@ router.get(
     query("offset").optional().isInt({ min: 0 }),
   ],
   validateRequest,
-  getRelatedPosts 
-)
+  getRelatedPosts
+);
 
 export default router;
