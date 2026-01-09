@@ -27,6 +27,34 @@ function generateVerificationEmail(token) {
   `;
 }
 
+function generateModeratorWarningEmail(message) {
+  const safeMessage = (message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+      body { font-family: Arial, sans-serif; line-height: 1.6; background-color: #f9f9f9; color: #333; }
+      .email-container { max-width: 600px; margin: 20px auto; background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+      .email-header { font-size: 20px; font-weight: bold; text-align: center; color: #c0392b; margin-bottom: 20px; }
+      .email-body { font-size: 16px; }
+      .email-note { margin-top: 20px; font-size: 14px; color: #555; }
+    </style>
+    </head>
+    <body>
+      <div class="email-container">
+        <div class="email-header">Moderator Notice</div>
+        <div class="email-body">
+          <p>Xin chào,</p>
+          <p>${safeMessage}</p>
+          <p class="email-note">Nếu bạn có thắc mắc, hãy phản hồi cho đội ngũ hỗ trợ.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 export async function sendMail(email, code) {
   console.log("Sending mail to:", email);
 
@@ -60,6 +88,41 @@ export async function sendMail(email, code) {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("[ERROR] MAIL SENDER: ", err);
+    throw err;
+  }
+}
+
+export async function sendModeratorWarning(email, message) {
+  console.log("Sending moderator warning to:", email);
+
+  if (!process.env.VITE_MAIL || !process.env.VITE_MAILTOKEN) {
+    console.warn(
+      "[WARN] Mail credentials not set (VITE_MAIL / VITE_MAILTOKEN). Email sending will likely fail."
+    );
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.VITE_MAIL,
+        pass: process.env.VITE_MAILTOKEN,
+      },
+    });
+
+    const email_content = generateModeratorWarningEmail(message);
+    const mailOptions = {
+      from: process.env.VITE_MAIL,
+      to: email,
+      subject: "Moderator Notice",
+      html: email_content,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("[INFO] MAIL SENDER (moderator): ", info.response);
+    return info;
+  } catch (err) {
+    console.error("[ERROR] MAIL SENDER (moderator): ", err);
     throw err;
   }
 }
