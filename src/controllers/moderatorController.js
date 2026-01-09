@@ -5,8 +5,13 @@ import prisma from '../config/prisma.js';
  */
 export async function getAllPosts(req, res) {
   const page = Math.max(parseInt(req.query.page || '1', 10), 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
-  const offset = (page - 1) * limit;
+  let limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+  let  offset = (page - 1) * limit;
+
+  if (req.query.start && req.query.end) {
+    limit = Math.min(Math.max(parseInt(req.query.end, 10) - parseInt(req.query.start, 10), 1), 100) + 1;
+    offset = Math.max(parseInt(req.query.start, 10), 0);
+  }
   
   // Filter options
   const includeDeleted = req.query.includeDeleted === 'true';
@@ -42,6 +47,7 @@ export async function getAllPosts(req, res) {
               username: true,
               display_name: true,
               email: true,
+              profile_image_url: true,
               role: true,
               is_active: true
             }
@@ -68,7 +74,7 @@ export async function getAllPosts(req, res) {
       cookTime: post.cook_time,
       servings: post.servings,
       difficulty: post.difficulty,
-      coverImageUrl: process.env.SERVER_URL + post.cover_image_url,
+      coverImgUrl: process.env.SERVER_URL + post.cover_image_url,
       createdAt: post.created_at,
       updatedAt: post.updated_at,
       isDeleted: post.is_deleted,
@@ -76,9 +82,10 @@ export async function getAllPosts(req, res) {
       deletedBy: post.deleted_by,
       author: {
         userId: post.users.user_id,
-        username: post.users.username,
+        authorName: post.users.username,
         displayName: post.users.display_name,
         email: post.users.email,
+        authorImgUrl: post.users.profile_image_url ? process.env.SERVER_URL + post.users.profile_image_url : null,
         role: post.users.role,
         isActive: post.users.is_active
       },
@@ -348,6 +355,55 @@ export async function deletePost(req, res) {
 }
 
 /**
+ * Restore a deleted post
+ */
+export async function restorePost(req, res) {
+  const { postId } = req.params;
+  const moderatorId = req.userId; // From authenticate middleware
+
+  try {
+    // Check if post exists
+    const post = await prisma.posts.findUnique({
+      where: { post_id: postId }
+    });
+    
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    // Check if post is already deleted
+    if (!post.is_deleted) {
+      return res.status(400).json({ message: 'Post is not deleted' });
+    }
+
+    // Restore: mark as not deleted
+    const restoredPost = await prisma.posts.update({
+      where: { post_id: postId },
+      data: {
+        is_deleted: false,
+        deleted_at: null,
+        deleted_by: null
+      }
+    });
+
+    // Log moderation action
+    await prisma.post_moderation.create({
+      data: {
+        actor_user_id: moderatorId,
+        target_type: 'post',
+        target_post_id: postId,
+        reason: 'Post restored by moderator'
+      }
+    });
+
+    return res.status(200).json({ message: 'Post restored successfully', postId });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
  * Delete a comment (soft delete)
  */
 export async function deleteComment(req, res) {
@@ -572,6 +628,62 @@ export async function getModerationStats(req, res) {
       staff: {
         moderators,
         admins
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Notify user about a post (moderator action)
+ */
+export async function notifyUser(req, res) {
+  const { postId } = req.params;
+  const { message } = req.body;
+  const moderatorId = req.userId; // From authenticate middleware
+
+  try {
+    // Validate message
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      return res.status(400).json({ message: 'Message is required' });
+    }
+
+    // Check if post exists
+    const post = await prisma.posts.findUnique({
+      where: { post_id: postId },
+      include: {
+        users: {
+          select: { user_id: true }
+        }
+      }
+    });
+
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    // Create notification
+    const notification = await prisma.notifications.create({
+      data: {
+        post_id: postId,
+        user_id: post.users.user_id,
+        moderator_id: moderatorId,
+        message: message.trim(),
+      }
+    });
+
+    return res.status(201).json({
+      message: 'Notification sent successfully',
+      notification: {
+        notificationId: notification.notification_id,
+        postId: notification.post_id,
+        userId: notification.user_id,
+        moderatorId: notification.moderator_id,
+        message: notification.message,
+        isRead: notification.is_read,
+        createdAt: notification.created_at
       }
     });
   } catch (err) {

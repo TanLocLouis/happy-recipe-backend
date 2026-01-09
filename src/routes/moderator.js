@@ -7,9 +7,11 @@ import {
   getModerationStats,
   deletePost,
   deleteComment,
+  restorePost,
   warnUser,
   banUser,
-  unbanUser
+  unbanUser,
+  notifyUser
 } from '../controllers/moderatorController.js';
 
 import { param, body } from 'express-validator';
@@ -38,6 +40,8 @@ router.get(
   [
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('start').optional().isInt({ min: 0 }),
+    query('end').optional().isInt({ min: 0 }),
     query('includeDeleted').optional().isBoolean(),
     query('userId').optional().isString(),
     query('search').optional().isString()
@@ -115,6 +119,34 @@ router.delete(
   ],
   validateRequest,
   deletePost
+);
+
+/**
+ * PATCH /api/moderator/posts/:postId/restore
+ * Restore a deleted post
+ */
+router.patch(
+  '/posts/:postId/restore',
+  [
+    param('postId').isString().notEmpty()
+  ],
+  validateRequest,
+  restorePost
+);
+
+/**
+ * POST /api/moderator/posts/:postId/notify
+ * Send notification to post owner
+ * Body: { message: string }
+ */
+router.post(
+  '/posts/:postId/notify',
+  [
+    param('postId').isString().notEmpty(),
+    body('message').isString().trim().isLength({ min: 1, max: 500 })
+  ],
+  validateRequest,
+  notifyUser
 );
 
 /**

@@ -144,6 +144,7 @@ model posts {
   users             users               @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: Restrict, map: "posts_ibfk_1")
   reactions         reactions[]
   steps             steps[]
+  notifications     notifications[]
 
   @@index([created_at], map: "idx_created_at")
   @@index([is_deleted], map: "idx_is_deleted")
@@ -190,6 +191,25 @@ model user_moderation {
   @@index([target_user_id], map: "idx_target_user_id")
 }
 
+model notifications {
+  notification_id BigInt   @id @default(autoincrement())
+  post_id         String   @db.Char(36)
+  user_id         String   @db.Char(36)
+  moderator_id    String   @db.Char(36)
+  message         String   @db.Text
+  is_read         Boolean  @default(false)
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+  posts           posts    @relation(fields: [post_id], references: [post_id], onDelete: Cascade, onUpdate: Restrict, map: "notifications_ibfk_1")
+  users           users    @relation("notifications_user", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: Restrict, map: "notifications_ibfk_2")
+  moderators      users    @relation("notifications_moderator", fields: [moderator_id], references: [user_id], onDelete: Cascade, onUpdate: Restrict, map: "notifications_ibfk_3")
+
+  @@index([user_id], map: "idx_notification_user_id")
+  @@index([post_id], map: "idx_notification_post_id")
+  @@index([moderator_id], map: "idx_notification_moderator_id")
+  @@index([is_read], map: "idx_notification_is_read")
+  @@index([created_at], map: "idx_notification_created_at")
+}
+
 model users {
   user_id                                               String            @id @db.Char(36)
   username                                              String?           @unique(map: "username") @db.VarChar(50)
@@ -213,6 +233,8 @@ model users {
   reactions                                             reactions[]
   user_moderation_user_moderation_target_user_idTousers user_moderation[] @relation("user_moderation_target_user_idTousers")
   user_moderation_user_moderation_actor_user_idTousers  user_moderation[] @relation("user_moderation_actor_user_idTousers")
+  notifications_user                                    notifications[]   @relation("notifications_user")
+  notifications_moderator                               notifications[]   @relation("notifications_moderator")
 
   @@index([email], map: "idx_email")
   @@index([username], map: "idx_username")
