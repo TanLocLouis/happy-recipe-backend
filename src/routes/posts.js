@@ -20,8 +20,6 @@ import cors from "cors";
 
 const router = Router();
 
-router.delete("/:id", authenticate, deletePost);
-
 // New endpoint for file upload with multipart/form-data
 router.post(
   "/",
@@ -47,6 +45,8 @@ router.post(
   validateRequest,
   createPost
 );
+
+router.delete("/:id", authenticate, deletePost);
 
 router.get(
   "/all",

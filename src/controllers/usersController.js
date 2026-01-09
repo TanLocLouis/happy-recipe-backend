@@ -62,7 +62,7 @@ export async function getUserNotifications(req, res) {
   try {
     const [notifications, total] = await Promise.all([
       prisma.notifications.findMany({
-        where: { user_id: userId },
+        where: { user_id: userId, is_read: false },
         include: {
           posts: {
             select: {
