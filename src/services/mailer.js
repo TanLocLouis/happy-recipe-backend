@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 
 function generateVerificationEmail(token) {
   return `
@@ -28,34 +28,38 @@ function generateVerificationEmail(token) {
 }
 
 export async function sendMail(email, code) {
+  console.log("Sending mail to:", email);
+
   if (!process.env.VITE_MAIL || !process.env.VITE_MAILTOKEN) {
-    console.warn('[WARN] Mail credentials not set (VITE_MAIL / VITE_MAILTOKEN). Email sending will likely fail.');
+    console.warn(
+      "[WARN] Mail credentials not set (VITE_MAIL / VITE_MAILTOKEN). Email sending will likely fail."
+    );
   }
 
   try {
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      service: "gmail",
       auth: {
         user: process.env.VITE_MAIL,
-        pass: process.env.VITE_MAILTOKEN
-      }
+        pass: process.env.VITE_MAILTOKEN,
+      },
     });
 
     const email_content = generateVerificationEmail(code);
     const mailOptions = {
       from: process.env.VITE_MAIL,
       to: email,
-      subject: 'ACCOUNT CONFIRMATION',
-      html: email_content
+      subject: "ACCOUNT CONFIRMATION",
+      html: email_content,
     };
 
     const info = await transporter.sendMail(mailOptions);
     // eslint-disable-next-line no-console
-    console.log('[INFO] MAIL SENDER: ', info.response);
+    console.log("[INFO] MAIL SENDER: ", info.response);
     return info;
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error('[ERROR] MAIL SENDER: ', err);
+    console.error("[ERROR] MAIL SENDER: ", err);
     throw err;
   }
 }

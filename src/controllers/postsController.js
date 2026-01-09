@@ -47,12 +47,45 @@ function mapPost(post) {
   };
 }
 
+export async function deletePost(req, res) {
+  console.log("[DEBUG] deletePost called");
+  const { id } = req.params;
+  const userId = req.userId;
+
+  try {
+    const post = await prisma.posts.findFirst({
+      where: { post_id: id, is_deleted: false },
+    });
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    if (post.user_id !== userId) {
+      return res.status(403).json({ message: "Forbidden: You can only delete your own posts" });
+    }
+
+    await prisma.posts.update({
+      where: { post_id: id },
+      data: {
+        is_deleted: true,
+        deleted_at: new Date(),
+        deleted_by: userId,
+      },
+    });
+
+    return res.status(200).json({ message: "Post deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting post:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 // New controller for handling post creation with file uploads
 export async function createPostWithUpload(req, res) {
   const embedded_content_value = await extractFeatures(req.body.title + req.body.description);
   const embedded_content = JSON.stringify(embedded_content_value);
   console.log("[DEBUG] createPost called with embedded_content:", embedded_content);
-
 
   // console.log('[DEBUG] createPostWithUpload called');
   // console.log('[DEBUG] req.body:', req.body);
@@ -627,7 +660,7 @@ export async function getPostComments(req, res) {
 export async function createPostComment(req, res) {
   console.log("[DEBUG] createPostComment called");
   const { id } = req.params; // postId
-  const userId = req.user.userId;
+  const userId = req.userId;
   const { content, parentCommentID } = req.body;
 
   try {
@@ -680,6 +713,9 @@ export async function getRelatedPosts(req, res) {
       select: {
         post_id: true,
         user_id: true,
+        users: {
+          select: { user_id: true, display_name: true, profile_image_url: true },
+        },
         title: true,
         description: true,
         cook_time: true,
@@ -698,9 +734,9 @@ export async function getRelatedPosts(req, res) {
       skip: offset,
     });
 
-
-    const targetPost = rows.find(p => p.post_id.slice(0, 8) === id);
-    const targetPostEmbedding = targetPost && targetPost.embedded_content ? JSON.parse(targetPost.embedded_content) : null;
+    const targetPost = rows.find((p) => p.post_id.slice(0, 8) === id);
+    const targetPostEmbedding =
+      targetPost && targetPost.embedded_content ? JSON.parse(targetPost.embedded_content) : null;
 
     if (!targetPostEmbedding) {
       return res.status(400).json({ message: "Target post does not have embedding data" });
@@ -708,8 +744,8 @@ export async function getRelatedPosts(req, res) {
 
     // Compute similarity scores
     const postsWithSimilarity = rows
-      .filter(p => p.post_id.slice(0, 8) !== id && p.embedded_content) // Exclude target post and those without embeddings
-      .map(p => {
+      .filter((p) => p.post_id.slice(0, 8) !== id && p.embedded_content) // Exclude target post and those without embeddings
+      .map((p) => {
         const embedding = JSON.parse(p.embedded_content);
         const similarity = cosineSimilarity(targetPostEmbedding, embedding);
         return { post: p, similarity };
@@ -717,11 +753,16 @@ export async function getRelatedPosts(req, res) {
 
     // Sort by similarity descending
     postsWithSimilarity.sort((a, b) => b.similarity - a.similarity);
-    const topPosts = postsWithSimilarity.slice(0, limit).map(ps => ps.post);
+    const topPosts = postsWithSimilarity.slice(0, limit).map((ps) => ps.post);
 
     const posts = topPosts.map((r) => ({
       postId: r.post_id,
       userId: r.user_id,
+      authorName: r.users ? r.users.display_name || null : null,
+      authorImgUrl:
+        r.users && r.users.profile_image_url
+          ? process.env.SERVER_URL + r.users.profile_image_url
+          : null,
       title: r.title,
       description: r.description,
       cookTime: r.cook_time,
