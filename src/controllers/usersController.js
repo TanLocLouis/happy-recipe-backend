@@ -125,6 +125,8 @@ export async function getUserNotifications(req, res) {
  * Mark notification as read
  */
 export async function markNotificationAsRead(req, res) {
+  console.log("[DEBUG] markNotificationAsRead called");  
+
   const { notificationId } = req.params;
   const userId = req.userId; // From authenticate middleware
 
