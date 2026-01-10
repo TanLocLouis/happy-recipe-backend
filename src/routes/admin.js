@@ -1,8 +1,7 @@
 import { Router } from "express";
 import { body, param } from "express-validator";
 import {
-	createModerator,
-	listModerators,
+	createModerator,	getStats,	listModerators,
 	removeModerator,
 } from "../controllers/adminController.js";
 import { authenticate } from "../middleware/authenticate.js";
@@ -14,6 +13,8 @@ const router = Router();
 // All admin routes require authentication + admin role
 router.use(authenticate);
 router.use(requireAdmin);
+
+router.get("/stats", getStats);
 
 router.get("/moderators", listModerators);
 
