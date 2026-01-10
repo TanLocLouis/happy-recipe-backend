@@ -229,6 +229,10 @@ export async function validate2FA(req, res) {
   const twoFactorToken = req.headers["authorization"]?.split(" ")[1];
   const code = req.body.code;
 
+  console.log("2FA validation endpoint hit");
+  console.log("Received twoFactorToken:", twoFactorToken);
+  console.log("Received code:", code);
+
   try {
     // Find 2FA record and include user
     const record = await prisma.fa.findFirst({ where: { code }, include: { users: true } });
