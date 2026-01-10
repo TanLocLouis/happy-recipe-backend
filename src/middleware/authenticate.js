@@ -1,4 +1,4 @@
-import { verifyToken } from '../utils/jwt.js';
+import { verifyToken } from "../utils/jwt.js";
 
 /**
  * Required authentication middleware
@@ -7,6 +7,7 @@ import { verifyToken } from '../utils/jwt.js';
  */
 export function authenticate(req, res, next) {
   // console.log('[DEBUG] authenticate middleware called');
+  console.log("Headers:", req.headers);
   try {
     const authHeader = req.headers['authorization'];
 
@@ -14,41 +15,41 @@ export function authenticate(req, res, next) {
       return res.status(401).json({ message: 'Missing or invalid authorization header' });
     }
 
-    const token = authHeader.split(' ')[1];
-    
+    const token = authHeader.split(" ")[1];
+
     if (!token) {
-      return res.status(401).json({ message: 'Missing token' });
+      return res.status(401).json({ message: "Missing token" });
     }
 
     let payload;
     try {
       payload = verifyToken(token);
     } catch (err) {
-      return res.status(401).json({ message: 'Invalid or expired token' });
+      return res.status(401).json({ message: "Invalid or expired token" });
     }
 
     const userId = payload.userId || payload.user_id;
-    
+
     if (!userId) {
-      return res.status(401).json({ message: 'Invalid token payload' });
+      return res.status(401).json({ message: "Invalid token payload" });
     }
 
     // Check if token is a refresh token (should not be used for authentication)
-    if (payload.type && payload.type === 'refresh') {
-      return res.status(400).json({ message: 'Refresh tokens cannot be used for authentication' });
+    if (payload.type && payload.type === "refresh") {
+      return res.status(400).json({ message: "Refresh tokens cannot be used for authentication" });
     }
 
     // Attach user info to request object
     req.userId = userId;
     req.user = {
       userId,
-      username: payload.username || null
+      username: payload.username || null,
     };
 
     next();
   } catch (err) {
-    console.error('Authentication error:', err);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("Authentication error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -59,15 +60,15 @@ export function authenticate(req, res, next) {
  */
 export function optionalAuthenticate(req, res, next) {
   try {
-    const authHeader = req.headers['authorization'];
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const authHeader = req.headers["authorization"];
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       // No token provided, continue without authentication
       return next();
     }
 
-    const token = authHeader.split(' ')[1];
-    
+    const token = authHeader.split(" ")[1];
+
     if (!token) {
       // Invalid format, continue without authentication
       return next();
@@ -76,13 +77,13 @@ export function optionalAuthenticate(req, res, next) {
     try {
       const payload = verifyToken(token);
       const userId = payload.userId || payload.user_id;
-      
-      if (userId && (!payload.type || payload.type !== 'refresh')) {
+
+      if (userId && (!payload.type || payload.type !== "refresh")) {
         // Valid access token, attach user info
         req.userId = userId;
         req.user = {
           userId,
-          username: payload.username || null
+          username: payload.username || null,
         };
       }
     } catch (err) {
@@ -92,9 +93,8 @@ export function optionalAuthenticate(req, res, next) {
 
     next();
   } catch (err) {
-    console.error('Optional authentication error:', err);
+    console.error("Optional authentication error:", err);
     // Even on error, continue without authentication for optional auth
     next();
   }
 }
-
