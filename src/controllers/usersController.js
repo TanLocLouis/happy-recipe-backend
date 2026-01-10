@@ -159,3 +159,97 @@ export async function markNotificationAsRead(req, res) {
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+/**
+ * Get posts by a specific user with pagination
+ */
+export async function getUserPosts(req, res) {
+  console.log("[DEBUG] getUserPosts called");
+
+  const { user_id } = req.params;
+  const currentUserId = req.userId || null; // From optionalAuthenticate middleware
+  const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+  const offset = (page - 1) * limit;
+
+  try {
+    // Check if user exists
+    const user = await prisma.users.findUnique({
+      where: { user_id },
+      select: { user_id: true, username: true, display_name: true, profile_image_url: true, is_active: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({ message: 'Account is disabled' });
+    }
+
+    const [posts, total] = await Promise.all([
+      prisma.posts.findMany({
+        where: { user_id, is_deleted: false },
+        include: {
+          reactions: {
+            select: { reaction_type: true, user_id: true }
+          },
+          bookmarks: {
+            select: { user_id: true }
+          }
+        },
+        orderBy: { created_at: 'desc' },
+        skip: offset,
+        take: limit
+      }),
+      prisma.posts.count({ where: { user_id, is_deleted: false } })
+    ]);
+
+    const userPosts = posts.map(post => {
+      // Count reactions by type
+      const reactionCounts = { like: 0, heart: 0, yum: 0 };
+      let userReaction = null;
+      for (const r of post.reactions) {
+        if (r.reaction_type) reactionCounts[r.reaction_type]++;
+        if (currentUserId && r.user_id === currentUserId) {
+          userReaction = r.reaction_type;
+        }
+      }
+
+      // Check if current user bookmarked this post
+      const userBookmark = currentUserId
+        ? post.bookmarks.some(b => b.user_id === currentUserId)
+        : false;
+
+      return {
+        postId: post.post_id,
+        title: post.title,
+        coverImgUrl: post.cover_image_url ? process.env.SERVER_URL + post.cover_image_url : null,
+        authorId: user.user_id,
+        authorName: user.display_name || user.username,
+        authorImgUrl: user.profile_image_url ? process.env.SERVER_URL + user.profile_image_url : null,
+        cookTime: post.cook_time,
+        servings: post.servings,
+        difficulty: post.difficulty,
+        reactions: reactionCounts,
+        userActions: {
+          userReaction,
+          userBookmark
+        }
+      };
+    });
+
+    return res.status(200).json({
+      userPosts,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}

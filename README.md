@@ -1,87 +1,127 @@
 
-## Happy Food Backend (Express + Prisma + MySQL)
+# Happy Food Backend
 
-Minimal setup guide plus the current HTTP surface (auth, posts, bookmarks, comments).
+> Express + Prisma + MySQL REST API for the Happy Food recipe sharing platform.
 
-### Prerequisites
-- Node.js 18+
-- MySQL 8+
+---
 
-### Quick start
-1) Copy `.env.example` (or create `.env`):
+## Prerequisites
+
+| Requirement | Version |
+|-------------|---------|
+| Node.js     | 18+     |
+| MySQL       | 8+      |
+
+---
+
+## Quick Start
+
+### 1. Configure Environment
+
+Create/edit `.env` file with **required** keys:
+
+```env
+SERVER_URL=your_server_ip
+DATABASE_URL=your_db_uri_string
 ```
-PORT=4000
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=
-```
-- No need to change this on local team dev
-```
+
+**Optional** configuration:
+
+```env
 DB_NAME=happy_recipe
 JWT_SECRET=supersecret_change_me
 JWT_EXPIRES_IN=7d
 VITE_MAIL=your.email@gmail.com
 VITE_MAILTOKEN=your_gmail_app_password
 ```
-2) Install deps
-```
+
+### 2. Install Dependencies
+
+```bash
 npm install
 ```
-3) Initialize DB schema 
-- Push current DB schema to DB server (MySQL, etc)
-```
+
+### 3. Initialize Database
+
+Push schema to MySQL server:
+
+```bash
 npx prisma db push
 ```
-- Generate Prisma client
-```
+
+Generate Prisma client:
+
+```bash
 npx prisma generate
 ```
-4) Seed sample data (users, posts, comments, reactions, bookmarks)
-```
+
+### 4. Seed Sample Data
+
+Populate with users, posts, comments, reactions, and bookmarks:
+
+```bash
 npx prisma db seed
 ```
-5) Run the API server
-```
+
+> 💡 **Tip:** To reset/drop all data, run:
+> ```bash
+> node ./prisma/reset.js
+> ```
+
+### 5. Start the Server
+
+```bash
 npm run dev
 ```
 
-### API overview (paths are under `/api`)
-- Auth
-  - `POST /auth/signup` — create account.
-  - `POST /auth/signin` — start email 2FA; returns `tempToken`.
-  - `POST /auth/validate/2fa` — exchange code + `tempToken` for `accessToken` + `refreshToken`.
-  - `POST /auth/validate/refresh-token` — refresh access token (accepts header or body token).
-  - `GET /auth/validate/access-token` — simple access-token check.
-  - `GET /auth/user-info` — returns user profile for the authenticated user (uses `req.userId`, no password check).
-- Posts
-  - `POST /posts` — create post (auth required).
-  - `GET /posts/all` — list posts (paginated `limit/offset`).
-  - `GET /posts/discover` — feed with reactions/bookmarks (optional auth to shape `userActions`).
-  - `GET /posts/latest` — latest posts; `details=true` includes ingredients/steps.
-  - `GET /posts/:id` — single post detail; optional auth populates `userActions`.
-  - `GET /posts/:id/comments` — paginated comments with reply counts (`page`, `limit`).
-- Reactions & bookmarks
-  - `POST /user-action/user-action` — unified mutations for reactions or bookmarks. Body: `{ action: "reaction" | "bookmark", postId, newReaction?, newBookmark? }` (auth required).
-  - `GET /user-action/bookmarks` — list current user's bookmarks.
-- Profile
-  - `GET /profile/:userId/bookmarks` — list bookmarked posts for a user (paginated); includes per-type reactions and viewer-specific actions.
-  - `GET /profile/:userId/posts` — list posts created by a user (paginated); includes per-type reactions and viewer-specific actions.
-  - `POST /profile/edit` — update display name and bio (auth required); avatar upload to be implemented.
-- Search
-  - `GET /search?query=...` — search posts by title (case-insensitive); includes per-type reactions and viewer-specific actions.
+---
 
-### Data / Prisma notes
-- Schema lives in `prisma/schema.prisma`; generated client is used across controllers.
-- `users.user_id` is a UUID string (CHAR(36)).
-- `BigInt.prototype.toJSON` is patched in `server.js` so IDs serialize as strings.
+## Data & Prisma
 
-### Database
-- SQL schema: `database/happy_recipe.sql` (used by `npm run db:init`).
-- Prisma seed: `prisma/seed.js` (triggered via `npx prisma db seed`).
+| Item | Description |
+|------|-------------|
+| Schema | `prisma/schema.prisma` |
+| User ID | UUID string (`CHAR(36)`) |
+| BigInt | Patched in `server.js` to serialize as strings |
 
-### API documentation
-- OpenAPI: `docs/openapi.yaml` (paste into https://editor.swagger.io/).
-- Postman: `docs/postman_collection.json`.
+---
 
+## Database Files
+
+| File | Purpose |
+|------|---------|
+| `database/happy_recipe.sql` | SQL schema (used by `npm run db:init`) |
+| `prisma/seed.js` | Seed script (via `npx prisma db seed`) |
+| `prisma/reset.js` | Reset/clear all data |
+
+---
+
+## API Documentation
+
+| Format | Location |
+|--------|----------|
+| OpenAPI | [`docs/openapi.yaml`](docs/openapi.yaml) → [Swagger Editor](https://editor.swagger.io/) |
+| Postman | [`docs/postman_collection.json`](docs/postman_collection.json) |
+
+---
+
+## Project Structure
+
+```
+├── prisma/
+│   ├── schema.prisma    # Database schema
+│   ├── seed.js          # Seed data script
+│   └── reset.js         # Reset database script
+├── src/
+│   ├── config/          # DB & Prisma config
+│   ├── controllers/     # Route handlers
+│   ├── middleware/      # Auth, validation, uploads
+│   ├── routes/          # API route definitions
+│   ├── services/        # Email & external services
+│   ├── utils/           # JWT, password, AI helpers
+│   └── server.js        # Express app entry
+├── docs/                # API documentation
+├── database/            # SQL scripts
+└── uploads/             # User uploaded files
+```
 
