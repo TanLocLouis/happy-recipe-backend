@@ -22,9 +22,9 @@ async function main() {
 
   // Base users (kept deterministic-ish) + generate extras
   const baseUsers = [
-    { username: 'alice', email: '23120057@student.hcmus.edu.vn', display_name: 'Alice', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg' },
-    { username: 'bob', email: 'bob@example.com', display_name: 'Bob', password: 'password123' },
-    { username: 'carol', email: 'carol@example.com', display_name: 'Carol', password: 'password123' }
+    { username: 'alice', email: '23120057@student.hcmus.edu.vn', display_name: 'Alice', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg', role: 'ADMIN' },
+    { username: 'bob', email: 'bob@example.com', display_name: 'Bob', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg', role: 'MODERATOR' },
+    { username: 'carol', email: 'carol@example.com', display_name: 'Carol', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg', role: 'USER' }
   ];
 
   const extraCount = 12; // generate 12 additional users for richer data
@@ -62,6 +62,18 @@ async function main() {
   ];
   const ingredientsPool = ['Salt', 'Pepper', 'Olive oil', 'Onion', 'Garlic', 'Tomato', 'Basil', 'Lemon', 'Chicken', 'Beef', 'Rice', 'Pasta', 'Coconut milk', 'Mushrooms', 'Spinach', 'Avocado', 'Eggs', 'Flour', 'Sugar'];
   const stepActions = ['Chop', 'Mix', 'Cook', 'Bake', 'Saute', 'Fry', 'Simmer', 'Blend', 'Season', 'Rest'];
+  const sampleImages = [
+    '/uploads/sample1.jpg',
+    '/uploads/sample2.jpg',
+    '/uploads/sample3.jpg',
+    '/uploads/sample4.jpg',
+    '/uploads/sample5.jpg',
+    '/uploads/sample6.jpg',
+    '/uploads/sample7.jpg',
+    '/uploads/sample8.jpg',
+    '/uploads/sample9.jpg',
+    '/uploads/sample10.jpg',
+  ];
 
   const createdPosts = [];
 
@@ -100,7 +112,7 @@ async function main() {
           cook_time,
           servings,
           difficulty,
-          cover_image_url: '/api/posts/files/sample.jpg',
+          cover_image_url: pick(sampleImages),
           ingredients: { create: ingredients },
           steps: { create: steps }
         }
