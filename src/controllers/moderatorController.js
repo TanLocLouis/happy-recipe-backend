@@ -1,40 +1,40 @@
-import prisma from '../config/prisma.js';
+import prisma from "../config/prisma.js";
 
 /**
  * Get all posts with pagination and filtering (for moderators)
  */
 export async function getAllPosts(req, res) {
-  const page = Math.max(parseInt(req.query.page || '1', 10), 1);
-  let limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
-  let  offset = (page - 1) * limit;
+  const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+  let limit = Math.min(Math.max(parseInt(req.query.limit || "20", 10), 1), 100);
+  let offset = (page - 1) * limit;
 
   if (req.query.start && req.query.end) {
-    limit = Math.min(Math.max(parseInt(req.query.end, 10) - parseInt(req.query.start, 10), 1), 100) + 1;
+    limit =
+      Math.min(Math.max(parseInt(req.query.end, 10) - parseInt(req.query.start, 10), 1), 100) + 1;
     offset = Math.max(parseInt(req.query.start, 10), 0);
   }
-  
+
   // Filter options
-  const includeDeleted = req.query.includeDeleted === 'true';
+  const postStatus = req.query.status;
   const userId = req.query.userId; // Filter by user
   const searchTerm = req.query.search; // Search in title/description
 
   try {
     // Build where clause
     const where = {};
-    
-    if (!includeDeleted) {
+
+    if (postStatus === "active") {
       where.is_deleted = false;
+    } else if (postStatus === "deleted") {
+      where.is_deleted = true;
     }
-    
+
     if (userId) {
       where.user_id = userId;
     }
-    
+
     if (searchTerm) {
-      where.OR = [
-        { title: { contains: searchTerm } },
-        { description: { contains: searchTerm } }
-      ];
+      where.OR = [{ title: { contains: searchTerm } }, { description: { contains: searchTerm } }];
     }
 
     const [posts, total] = await Promise.all([
@@ -49,25 +49,25 @@ export async function getAllPosts(req, res) {
               email: true,
               profile_image_url: true,
               role: true,
-              is_active: true
-            }
+              is_active: true,
+            },
           },
           _count: {
             select: {
               comments: true,
               reactions: true,
-              bookmarks: true
-            }
-          }
+              bookmarks: true,
+            },
+          },
         },
-        orderBy: { created_at: 'desc' },
+        orderBy: { created_at: "desc" },
         skip: offset,
-        take: limit
+        take: limit,
       }),
-      prisma.posts.count({ where })
+      prisma.posts.count({ where }),
     ]);
 
-    const formattedPosts = posts.map(post => ({
+    const formattedPosts = posts.map((post) => ({
       postId: post.post_id,
       title: post.title,
       description: post.description,
@@ -85,15 +85,17 @@ export async function getAllPosts(req, res) {
         authorName: post.users.username,
         displayName: post.users.display_name,
         email: post.users.email,
-        authorImgUrl: post.users.profile_image_url ? process.env.SERVER_URL + post.users.profile_image_url : null,
+        authorImgUrl: post.users.profile_image_url
+          ? process.env.SERVER_URL + post.users.profile_image_url
+          : null,
         role: post.users.role,
-        isActive: post.users.is_active
+        isActive: post.users.is_active,
       },
       stats: {
         comments: post._count.comments,
         reactions: post._count.reactions,
-        bookmarks: post._count.bookmarks
-      }
+        bookmarks: post._count.bookmarks,
+      },
     }));
 
     return res.status(200).json({
@@ -102,12 +104,12 @@ export async function getAllPosts(req, res) {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -115,12 +117,12 @@ export async function getAllPosts(req, res) {
  * Get all comments with pagination and filtering (for moderators)
  */
 export async function getAllComments(req, res) {
-  const page = Math.max(parseInt(req.query.page || '1', 10), 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+  const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || "20", 10), 1), 100);
   const offset = (page - 1) * limit;
-  
+
   // Filter options
-  const includeDeleted = req.query.includeDeleted === 'true';
+  const includeDeleted = req.query.includeDeleted === "true";
   const userId = req.query.userId; // Filter by user
   const postId = req.query.postId; // Filter by post
   const searchTerm = req.query.search; // Search in comment text
@@ -128,19 +130,19 @@ export async function getAllComments(req, res) {
   try {
     // Build where clause
     const where = {};
-    
+
     if (!includeDeleted) {
       where.is_deleted = false;
     }
-    
+
     if (userId) {
       where.user_id = userId;
     }
-    
+
     if (postId) {
       where.post_id = postId;
     }
-    
+
     if (searchTerm) {
       where.comment_text = { contains: searchTerm };
     }
@@ -156,24 +158,24 @@ export async function getAllComments(req, res) {
               display_name: true,
               email: true,
               role: true,
-              is_active: true
-            }
+              is_active: true,
+            },
           },
           posts: {
             select: {
               post_id: true,
-              title: true
-            }
-          }
+              title: true,
+            },
+          },
         },
-        orderBy: { created_at: 'desc' },
+        orderBy: { created_at: "desc" },
         skip: offset,
-        take: limit
+        take: limit,
       }),
-      prisma.comments.count({ where })
+      prisma.comments.count({ where }),
     ]);
 
-    const formattedComments = comments.map(comment => ({
+    const formattedComments = comments.map((comment) => ({
       commentId: String(comment.comment_id),
       postId: comment.post_id,
       postTitle: comment.posts.title,
@@ -190,8 +192,8 @@ export async function getAllComments(req, res) {
         displayName: comment.users.display_name,
         email: comment.users.email,
         role: comment.users.role,
-        isActive: comment.users.is_active
-      }
+        isActive: comment.users.is_active,
+      },
     }));
 
     return res.status(200).json({
@@ -200,12 +202,12 @@ export async function getAllComments(req, res) {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -213,10 +215,10 @@ export async function getAllComments(req, res) {
  * Get all users with pagination and filtering (for moderators)
  */
 export async function getAllUsers(req, res) {
-  const page = Math.max(parseInt(req.query.page || '1', 10), 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+  const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || "20", 10), 1), 100);
   const offset = (page - 1) * limit;
-  
+
   // Filter options
   const role = req.query.role; // Filter by role (USER, MODERATOR, ADMIN)
   const isActive = req.query.isActive; // Filter by active status
@@ -225,20 +227,20 @@ export async function getAllUsers(req, res) {
   try {
     // Build where clause
     const where = {};
-    
-    if (role && ['USER', 'MODERATOR', 'ADMIN'].includes(role)) {
+
+    if (role && ["USER", "MODERATOR", "ADMIN"].includes(role)) {
       where.role = role;
     }
-    
+
     if (isActive !== undefined) {
-      where.is_active = isActive === 'true';
+      where.is_active = isActive === "true";
     }
-    
+
     if (searchTerm) {
       where.OR = [
         { username: { contains: searchTerm } },
         { email: { contains: searchTerm } },
-        { display_name: { contains: searchTerm } }
+        { display_name: { contains: searchTerm } },
       ];
     }
 
@@ -263,18 +265,18 @@ export async function getAllUsers(req, res) {
               posts: true,
               comments: true,
               reactions: true,
-              bookmarks: true
-            }
-          }
+              bookmarks: true,
+            },
+          },
         },
-        orderBy: { created_at: 'desc' },
+        orderBy: { created_at: "desc" },
         skip: offset,
-        take: limit
+        take: limit,
       }),
-      prisma.users.count({ where })
+      prisma.users.count({ where }),
     ]);
 
-    const formattedUsers = users.map(user => ({
+    const formattedUsers = users.map((user) => ({
       userId: user.user_id,
       username: user.username,
       email: user.email,
@@ -291,8 +293,8 @@ export async function getAllUsers(req, res) {
         posts: user._count.posts,
         comments: user._count.comments,
         reactions: user._count.reactions,
-        bookmarks: user._count.bookmarks
-      }
+        bookmarks: user._count.bookmarks,
+      },
     }));
 
     return res.status(200).json({
@@ -301,12 +303,12 @@ export async function getAllUsers(req, res) {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -320,11 +322,11 @@ export async function deletePost(req, res) {
   try {
     // Check if post exists
     const post = await prisma.posts.findUnique({
-      where: { post_id: postId }
+      where: { post_id: postId },
     });
-    
+
     if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     // Soft delete: mark as deleted
@@ -333,24 +335,24 @@ export async function deletePost(req, res) {
       data: {
         is_deleted: true,
         deleted_at: new Date(),
-        deleted_by: moderatorId
-      }
+        deleted_by: moderatorId,
+      },
     });
 
     // Log moderation action
     await prisma.post_moderation.create({
       data: {
         actor_user_id: moderatorId,
-        target_type: 'post',
+        target_type: "post",
         target_post_id: postId,
-        reason: 'Post deleted by moderator'
-      }
+        reason: "Post deleted by moderator",
+      },
     });
 
-    return res.status(200).json({ message: 'Post deleted successfully', postId });
+    return res.status(200).json({ message: "Post deleted successfully", postId });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -364,16 +366,16 @@ export async function restorePost(req, res) {
   try {
     // Check if post exists
     const post = await prisma.posts.findUnique({
-      where: { post_id: postId }
+      where: { post_id: postId },
     });
-    
+
     if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     // Check if post is already deleted
     if (!post.is_deleted) {
-      return res.status(400).json({ message: 'Post is not deleted' });
+      return res.status(400).json({ message: "Post is not deleted" });
     }
 
     // Restore: mark as not deleted
@@ -382,24 +384,24 @@ export async function restorePost(req, res) {
       data: {
         is_deleted: false,
         deleted_at: null,
-        deleted_by: null
-      }
+        deleted_by: null,
+      },
     });
 
     // Log moderation action
     await prisma.post_moderation.create({
       data: {
         actor_user_id: moderatorId,
-        target_type: 'post',
+        target_type: "post",
         target_post_id: postId,
-        reason: 'Post restored by moderator'
-      }
+        reason: "Post restored by moderator",
+      },
     });
 
-    return res.status(200).json({ message: 'Post restored successfully', postId });
+    return res.status(200).json({ message: "Post restored successfully", postId });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -413,35 +415,35 @@ export async function deleteComment(req, res) {
   try {
     // Check if comment exists
     const comment = await prisma.comments.findUnique({
-      where: { comment_id: BigInt(commentId) }
+      where: { comment_id: BigInt(commentId) },
     });
 
     if (!comment) {
-      return res.status(404).json({ message: 'Comment not found' });
+      return res.status(404).json({ message: "Comment not found" });
     }
 
     // Soft delete: mark as deleted
     const updatedComment = await prisma.comments.update({
       where: { comment_id: BigInt(commentId) },
       data: {
-        is_deleted: true
-      }
+        is_deleted: true,
+      },
     });
 
     // Log moderation action
     await prisma.post_moderation.create({
       data: {
         actor_user_id: moderatorId,
-        target_type: 'comment',
+        target_type: "comment",
         target_comment_id: BigInt(commentId),
-        reason: 'Comment deleted by moderator'
-      }
+        reason: "Comment deleted by moderator",
+      },
     });
 
-    return res.status(200).json({ message: 'Comment deleted successfully', commentId });
+    return res.status(200).json({ message: "Comment deleted successfully", commentId });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -454,17 +456,17 @@ export async function warnUser(req, res) {
   const moderatorId = req.userId; // From authenticate middleware
 
   try {
-    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
-      return res.status(400).json({ message: 'Reason is required' });
+    if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
+      return res.status(400).json({ message: "Reason is required" });
     }
 
     // Check if target user exists
     const targetUser = await prisma.users.findUnique({
-      where: { user_id: userId }
+      where: { user_id: userId },
     });
 
     if (!targetUser) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Create warning record (actor_user_id, target_user_id)
@@ -472,18 +474,18 @@ export async function warnUser(req, res) {
       data: {
         actor_user_id: moderatorId,
         target_user_id: userId,
-        action_type: 'warning',
-        reason: reason.trim()
-      }
+        action_type: "warning",
+        reason: reason.trim(),
+      },
     });
 
-    return res.status(200).json({ 
-      message: 'User warned successfully',
-      warningId: warning.action_id
+    return res.status(200).json({
+      message: "User warned successfully",
+      warningId: warning.action_id,
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -496,28 +498,28 @@ export async function banUser(req, res) {
   const moderatorId = req.userId; // From authenticate middleware
 
   try {
-    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
-      return res.status(400).json({ message: 'Reason is required' });
+    if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
+      return res.status(400).json({ message: "Reason is required" });
     }
 
     // Check if target user exists
     const targetUser = await prisma.users.findUnique({
-      where: { user_id: userId }
+      where: { user_id: userId },
     });
 
     if (!targetUser) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Cannot ban admin
-    if (targetUser.role === 'ADMIN') {
-      return res.status(403).json({ message: 'Cannot ban admin users' });
+    if (targetUser.role === "ADMIN") {
+      return res.status(403).json({ message: "Cannot ban admin users" });
     }
 
     // Ban user (set is_active to false)
     await prisma.users.update({
       where: { user_id: userId },
-      data: { is_active: false }
+      data: { is_active: false },
     });
 
     // Create ban record (actor_user_id, target_user_id)
@@ -525,18 +527,18 @@ export async function banUser(req, res) {
       data: {
         actor_user_id: moderatorId,
         target_user_id: userId,
-        action_type: 'ban',
-        reason: reason.trim()
-      }
+        action_type: "ban",
+        reason: reason.trim(),
+      },
     });
 
-    return res.status(200).json({ 
-      message: 'User banned successfully',
-      banId: ban.action_id
+    return res.status(200).json({
+      message: "User banned successfully",
+      banId: ban.action_id,
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -550,21 +552,21 @@ export async function unbanUser(req, res) {
   try {
     // Check if target user exists
     const targetUser = await prisma.users.findUnique({
-      where: { user_id: userId }
+      where: { user_id: userId },
     });
 
     if (!targetUser) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     if (targetUser.is_active) {
-      return res.status(400).json({ message: 'User is not banned' });
+      return res.status(400).json({ message: "User is not banned" });
     }
 
     // Unban user (set is_active to true)
     await prisma.users.update({
       where: { user_id: userId },
-      data: { is_active: true }
+      data: { is_active: true },
     });
 
     // Log unban action in user_moderation (actor_user_id, target_user_id)
@@ -572,15 +574,15 @@ export async function unbanUser(req, res) {
       data: {
         actor_user_id: moderatorId,
         target_user_id: userId,
-        action_type: 'unban',
-        reason: 'User unbanned by moderator',
-      }
+        action_type: "unban",
+        reason: "User unbanned by moderator",
+      },
     });
 
-    return res.status(200).json({ message: 'User unbanned successfully' });
+    return res.status(200).json({ message: "User unbanned successfully" });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -597,7 +599,7 @@ export async function getModerationStats(req, res) {
       totalComments,
       deletedComments,
       moderators,
-      admins
+      admins,
     ] = await Promise.all([
       prisma.users.count(),
       prisma.users.count({ where: { is_active: true } }),
@@ -605,34 +607,34 @@ export async function getModerationStats(req, res) {
       prisma.posts.count({ where: { is_deleted: true } }),
       prisma.comments.count(),
       prisma.comments.count({ where: { is_deleted: true } }),
-      prisma.users.count({ where: { role: 'MODERATOR' } }),
-      prisma.users.count({ where: { role: 'ADMIN' } })
+      prisma.users.count({ where: { role: "MODERATOR" } }),
+      prisma.users.count({ where: { role: "ADMIN" } }),
     ]);
 
     return res.status(200).json({
       users: {
         total: totalUsers,
         active: activeUsers,
-        inactive: totalUsers - activeUsers
+        inactive: totalUsers - activeUsers,
       },
       posts: {
         total: totalPosts,
         active: totalPosts - deletedPosts,
-        deleted: deletedPosts
+        deleted: deletedPosts,
       },
       comments: {
         total: totalComments,
         active: totalComments - deletedComments,
-        deleted: deletedComments
+        deleted: deletedComments,
       },
       staff: {
         moderators,
-        admins
-      }
+        admins,
+      },
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -646,8 +648,8 @@ export async function notifyUser(req, res) {
 
   try {
     // Validate message
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      return res.status(400).json({ message: 'Message is required' });
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
+      return res.status(400).json({ message: "Message is required" });
     }
 
     // Check if post exists
@@ -655,13 +657,13 @@ export async function notifyUser(req, res) {
       where: { post_id: postId },
       include: {
         users: {
-          select: { user_id: true }
-        }
-      }
+          select: { user_id: true },
+        },
+      },
     });
 
     if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     // Create notification
@@ -671,11 +673,11 @@ export async function notifyUser(req, res) {
         user_id: post.users.user_id,
         moderator_id: moderatorId,
         message: message.trim(),
-      }
+      },
     });
 
     return res.status(201).json({
-      message: 'Notification sent successfully',
+      message: "Notification sent successfully",
       notification: {
         notificationId: notification.notification_id,
         postId: notification.post_id,
@@ -683,11 +685,11 @@ export async function notifyUser(req, res) {
         moderatorId: notification.moderator_id,
         message: notification.message,
         isRead: notification.is_read,
-        createdAt: notification.created_at
-      }
+        createdAt: notification.created_at,
+      },
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
