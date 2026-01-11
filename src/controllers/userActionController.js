@@ -13,12 +13,12 @@ export async function uploadUserAction(req, res) {
 
     // Extract request body
     const { action, postId, newReaction, newBookmark } = req.body;
-    console.log("Received uploadUserAction request:", {
-      action,
-      postId,
-      newReaction,
-      newBookmark,
-    });
+    // console.log("Received uploadUserAction request:", {
+    //   action,
+    //   postId,
+    //   newReaction,
+    //   newBookmark,
+    // });
 
     if (!action || !postId) {
       return res.status(400).json({ message: "action and postId are required" });

@@ -511,13 +511,13 @@ export async function discoverPosts(req, res) {
       };
     });
 
-    console.log("[DEBUG] discoverPosts postList:", postList);
+    // console.log("[DEBUG] discoverPosts postList:", postList);
     const body = {
       postList,
       tokenState: req.tokenState || "",
     };
 
-    console.log("[DEBUG] discoverPosts response body:", body);
+    // console.log("[DEBUG] discoverPosts response body:", body);
 
     return res.status(200).json(body);
   } catch (err) {
@@ -703,6 +703,62 @@ export async function createPostComment(req, res) {
     return res.status(201).json({ commentId: String(created.comment_id) });
   } catch (err) {
     console.error(err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function getUserReactionForPost(req, res) {
+  console.log("[DEBUG] getUserReactionForPost called");
+  const { id } = req.params; // postId
+  const userId = req.userId;
+
+  try {
+    // Ensure post exists and not deleted
+    const post = await prisma.posts.findFirst({
+      where: { post_id: id, is_deleted: false },
+    });
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // Get all reactions for this post to count by type
+    const reactionsRows = await prisma.reactions.findMany({
+      where: { post_id: id },
+      select: { reaction_type: true },
+    });
+
+    const reactions = { like: 0, heart: 0, yum: 0 };
+    for (const r of reactionsRows) {
+      const type = r.reaction_type || "like";
+      if (type === "like" || type === "heart" || type === "yum") {
+        reactions[type]++;
+      }
+    }
+
+    // Get user's reaction for this post
+    const reaction = await prisma.reactions.findUnique({
+      where: {
+        user_id_post_id: { user_id: userId, post_id: id },
+      },
+      select: { reaction_type: true },
+    });
+
+    // Get user's bookmark status
+    const bookmark = await prisma.bookmarks.findUnique({
+      where: { unique_user_post_bookmark: { user_id: userId, post_id: id } },
+    });
+
+    return res.status(200).json({
+      postId: id,
+      reactions,
+      userActions: {
+        userReaction: reaction ? reaction.reaction_type : null,
+        userBookmark: !!bookmark,
+      },
+    });
+  } catch (err) {
+    console.error("Error getting user reaction:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
