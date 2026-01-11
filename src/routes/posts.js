@@ -11,6 +11,7 @@ import {
   createPostComment,
   getRelatedPosts,
   deletePost,
+  getUserReactionForPost,
 } from "../controllers/postsController.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { authenticate, optionalAuthenticate } from "../middleware/authenticate.js";
@@ -145,6 +146,15 @@ router.get(
   ],
   validateRequest,
   getRelatedPosts
+);
+
+// Get user's reaction status for a specific post
+router.get(
+  "/:id/user-action",
+  authenticate,
+  [param("id").isString().isLength({ min: 1, max: 36 })],
+  validateRequest,
+  getUserReactionForPost
 );
 
 export default router;
