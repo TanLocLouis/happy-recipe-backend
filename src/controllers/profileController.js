@@ -1,11 +1,11 @@
-import prisma from '../config/prisma.js';
+import prisma from "../config/prisma.js";
 
 export async function listBookmarks(req, res) {
-  console.log('[DEBUG] listBookmarks called');
-  console.log('[DEBUG] Query params:', req.params);
+  console.log("[DEBUG] listBookmarks called");
+  console.log("[DEBUG] Query params:", req.params);
   try {
     // userId is available from authenticate middleware
-    const { userId }= req.params;
+    const { userId } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
@@ -28,66 +28,79 @@ export async function listBookmarks(req, res) {
             is_deleted: true,
             deleted_at: true,
             deleted_by: true,
-            users: { select: { user_id: true, username: true, display_name: true, profile_image_url: true } },
+            users: {
+              select: {
+                user_id: true,
+                username: true,
+                display_name: true,
+                profile_image_url: true,
+              },
+            },
             _count: {
               select: {
                 reactions: true,
-                comments: true
-              }
+                comments: true,
+              },
             },
             reactions: {
               where: { user_id: userId },
-              select: { reaction_type: true }
+              select: { reaction_type: true },
             },
             bookmarks: {
               where: { user_id: userId },
-              select: { bookmark_id: true }
-            }
-          }
-        }
+              select: { bookmark_id: true },
+            },
+          },
+        },
       },
-      orderBy: { bookmark_id: 'desc' },
+      orderBy: { bookmark_id: "desc" },
       skip: offset,
-      take: limit
+      take: limit,
     });
 
     const bookmarkedPosts = rows
-      .filter(r => r.posts && !r.posts.is_deleted)
-      .map(r => {
+      .filter((r) => r.posts && !r.posts.is_deleted)
+      .map((r) => {
         const p = r.posts;
         const author = p.users || null;
-        const userReaction = p.reactions && p.reactions.length > 0 ? p.reactions[0].reaction_type : null;
-        
+        const userReaction =
+          p.reactions && p.reactions.length > 0 ? p.reactions[0].reaction_type : null;
+
         return {
           postId: p.post_id,
           title: p.title,
           coverImgUrl: process.env.SERVER_URL + p.cover_image_url || null,
           authorId: p.user_id,
-          authorName: author ? (author.display_name || author.username || null) : null,
-          authorImgUrl: author && author.profile_image_url ? (process.env.SERVER_URL + author.profile_image_url) : null,
+          authorName: author ? author.display_name || author.username || null : null,
+          authorImgUrl:
+            author && author.profile_image_url
+              ? process.env.SERVER_URL + author.profile_image_url
+              : null,
           cookTime: p.cook_time ?? null,
           servings: p.servings ?? null,
           difficulty: p.difficulty || null,
           reactions: {
             total: p._count.reactions || 0,
-            comments: p._count.comments || 0
+            comments: p._count.comments || 0,
           },
           userActions: {
             userReaction: userReaction,
-            userBookmark: p.bookmarks && p.bookmarks.length > 0
-          }
+            userBookmark: p.bookmarks && p.bookmarks.length > 0,
+          },
         };
       });
+
+    console.log("[DEBUG] bookmarkedPosts:", bookmarkedPosts);
 
     return res.status(200).json({ bookmarkedPosts });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
 export async function listUserPosts(req, res) {
-  console.log('[DEBUG] listUserPosts called');
+  console.log("[DEBUG] listUserPosts called");
   try {
     const profileUserId = req.params.userId;
     const viewerUserId = req.userId || null;
@@ -105,39 +118,41 @@ export async function listUserPosts(req, res) {
       difficulty: true,
       cover_image_url: true,
       created_at: true,
-      users: { select: { user_id: true, username: true, display_name: true, profile_image_url: true } }
+      users: {
+        select: { user_id: true, username: true, display_name: true, profile_image_url: true },
+      },
     };
 
     if (viewerUserId) {
       // @ts-ignore dynamic field add
       postSelect.reactions = {
         where: { user_id: viewerUserId },
-        select: { reaction_type: true }
+        select: { reaction_type: true },
       };
       // @ts-ignore dynamic field add
       postSelect.bookmarks = {
         where: { user_id: viewerUserId },
-        select: { bookmark_id: true }
+        select: { bookmark_id: true },
       };
     }
 
     const posts = await prisma.posts.findMany({
       where: { user_id: profileUserId, is_deleted: false },
       select: postSelect,
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: "desc" },
       skip: offset,
-      take: limit
+      take: limit,
     });
 
-    const postIds = posts.map(p => p.post_id);
+    const postIds = posts.map((p) => p.post_id);
 
     // Get per-type reaction counts for these posts
     let grouped = [];
     if (postIds.length > 0) {
       grouped = await prisma.reactions.groupBy({
-        by: ['post_id', 'reaction_type'],
+        by: ["post_id", "reaction_type"],
         where: { post_id: { in: postIds } },
-        _count: { _all: true }
+        _count: { _all: true },
       });
     }
 
@@ -147,15 +162,16 @@ export async function listUserPosts(req, res) {
     }
     for (const g of grouped) {
       const entry = countsMap.get(g.post_id) || { like: 0, heart: 0, yum: 0 };
-      if (g.reaction_type === 'like') entry.like = g._count._all;
-      else if (g.reaction_type === 'heart') entry.heart = g._count._all;
-      else if (g.reaction_type === 'yum') entry.yum = g._count._all;
+      if (g.reaction_type === "like") entry.like = g._count._all;
+      else if (g.reaction_type === "heart") entry.heart = g._count._all;
+      else if (g.reaction_type === "yum") entry.yum = g._count._all;
       countsMap.set(g.post_id, entry);
     }
 
-    const userPosts = posts.map(p => {
+    const userPosts = posts.map((p) => {
       const author = p.users || null;
-      const userReaction = p.reactions && p.reactions.length > 0 ? p.reactions[0].reaction_type : null;
+      const userReaction =
+        p.reactions && p.reactions.length > 0 ? p.reactions[0].reaction_type : null;
       const userBookmark = p.bookmarks ? p.bookmarks.length > 0 : false;
       const reactionCounts = countsMap.get(p.post_id) || { like: 0, heart: 0, yum: 0 };
       return {
@@ -163,55 +179,58 @@ export async function listUserPosts(req, res) {
         title: p.title,
         coverImgUrl: process.env.SERVER_URL + p.cover_image_url || null,
         authorId: p.user_id,
-        authorName: author ? (author.display_name || author.username || null) : null,
-        authorImgUrl: author && author.profile_image_url ? (process.env.SERVER_URL + author.profile_image_url) : null,
+        authorName: author ? author.display_name || author.username || null : null,
+        authorImgUrl:
+          author && author.profile_image_url
+            ? process.env.SERVER_URL + author.profile_image_url
+            : null,
         cookTime: p.cook_time ?? null,
         servings: p.servings ?? null,
         difficulty: p.difficulty || null,
         reactions: reactionCounts,
         userActions: {
           userReaction: userReaction,
-          userBookmark: userBookmark
-        }
+          userBookmark: userBookmark,
+        },
       };
     });
 
     return res.status(200).json({ userPosts });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
 export async function editProfile(req, res) {
-  console.log('[DEBUG] editProfile called');
+  console.log("[DEBUG] editProfile called");
   try {
     const userId = req.userId;
-    console.log('[DEBUG] Authenticated userId:', userId);
-    
+    console.log("[DEBUG] Authenticated userId:", userId);
+
     if (!userId) {
-      return res.status(401).json({ message: 'Unauthorized: user not authenticated' });
+      return res.status(401).json({ message: "Unauthorized: user not authenticated" });
     }
 
     const { displayName, bio } = req.body;
     const data = {};
 
-    if (displayName !== undefined && displayName !== null && displayName.trim() !== '') {
+    if (displayName !== undefined && displayName !== null && displayName.trim() !== "") {
       data.display_name = displayName.trim();
     }
-    if (bio !== undefined && bio !== null && bio.trim() !== '') {
+    if (bio !== undefined && bio !== null && bio.trim() !== "") {
       data.bio = bio.trim();
     }
 
     // Handle avatar file upload
     if (req.file) {
       const avatarUrl = `/api/profile/files/${req.file.filename}`;
-      console.log('[DEBUG] New avatar uploaded:', avatarUrl);
+      console.log("[DEBUG] New avatar uploaded:", avatarUrl);
       data.profile_image_url = avatarUrl;
     }
 
     if (Object.keys(data).length === 0) {
-      return res.status(400).json({ message: 'No changes provided' });
+      return res.status(400).json({ message: "No changes provided" });
     }
 
     const updated = await prisma.users.update({
@@ -222,8 +241,8 @@ export async function editProfile(req, res) {
         username: true,
         display_name: true,
         bio: true,
-        profile_image_url: true
-      }
+        profile_image_url: true,
+      },
     });
 
     return res.status(200).json({
@@ -232,12 +251,11 @@ export async function editProfile(req, res) {
         username: updated.username,
         displayName: updated.display_name,
         bio: updated.bio,
-        avatarUrl: process.env.SERVER_URL + updated.profile_image_url || null
-      }
+        avatarUrl: process.env.SERVER_URL + updated.profile_image_url || null,
+      },
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
-

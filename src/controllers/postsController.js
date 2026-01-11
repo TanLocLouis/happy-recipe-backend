@@ -511,7 +511,15 @@ export async function discoverPosts(req, res) {
       };
     });
 
-    return res.status(200).json({ postList });
+    console.log("[DEBUG] discoverPosts postList:", postList);
+    const body = {
+      postList,
+      tokenState: req.tokenState || "",
+    };
+
+    console.log("[DEBUG] discoverPosts response body:", body);
+
+    return res.status(200).json(body);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Internal server error" });
@@ -576,6 +584,8 @@ export async function getLatestPosts(req, res) {
     });
 
     const posts = postsRaw.map(mapPost);
+
+    console.log("[DEBUG] getLatestPosts posts:", posts);
 
     return res.status(200).json({ posts });
   } catch (err) {

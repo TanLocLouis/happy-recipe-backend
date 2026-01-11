@@ -87,8 +87,7 @@ export function optionalAuthenticate(req, res, next) {
         };
       }
     } catch (err) {
-      // Token invalid or expired, continue without authentication
-      // This allows public access to routes that use optional auth
+      req.tokenState = "expired";
     }
 
     next();
