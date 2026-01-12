@@ -569,6 +569,7 @@ export async function getLatestPosts(req, res) {
         deletedAt: r.deleted_at,
         deletedBy: r.deleted_by,
       }));
+
       return res.status(200).json({ posts });
     }
 
@@ -583,7 +584,65 @@ export async function getLatestPosts(req, res) {
       skip: offset,
     });
 
-    const posts = postsRaw.map(mapPost);
+    const postIds = postsRaw.map((r) => r.post_id);
+    const currentUserId = req.userId || null;
+
+    // Fetch reactions for these posts
+    const reactionsRows =
+      postIds.length > 0
+        ? await prisma.reactions.findMany({
+            where: { post_id: { in: postIds } },
+            select: { post_id: true, reaction_type: true, user_id: true },
+          })
+        : [];
+
+    // Build reactions map: { postId: { like: n, heart: n, yum: n } }
+    const reactionsMap = {};
+    for (const r of reactionsRows) {
+      const pid = r.post_id;
+      if (!reactionsMap[pid]) reactionsMap[pid] = { like: 0, heart: 0, yum: 0 };
+      const type = r.reaction_type || "like";
+      if (reactionsMap[pid][type] !== undefined) {
+        reactionsMap[pid][type]++;
+      }
+    }
+
+    // If current user specified, fetch their reactions and bookmarks
+    let userReactions = [];
+    let userBookmarks = [];
+    if (currentUserId) {
+      userReactions = await prisma.reactions.findMany({
+        where: { post_id: { in: postIds }, user_id: currentUserId },
+        select: { post_id: true, reaction_type: true },
+      });
+      userBookmarks = await prisma.bookmarks.findMany({
+        where: { post_id: { in: postIds }, user_id: currentUserId },
+        select: { post_id: true },
+      });
+    }
+
+    const bookmarkSet = new Set(userBookmarks.map((b) => b.post_id));
+    const userReactionMap = {};
+    for (const ur of userReactions) userReactionMap[ur.post_id] = ur.reaction_type || null;
+
+    const posts = postsRaw.map((post) => {
+      const pid = post.post_id;
+      const react = reactionsMap[pid] || { like: 0, heart: 0, yum: 0 };
+      const userActions = {
+        userBookmark: currentUserId ? bookmarkSet.has(pid) : false,
+        userReaction: currentUserId ? userReactionMap[pid] || null : null,
+      };
+
+      return {
+        ...mapPost(post),
+        reactions: {
+          like: react.like || 0,
+          heart: react.heart || 0,
+          yum: react.yum || 0,
+        },
+        userActions,
+      };
+    });
 
     console.log("[DEBUG] getLatestPosts posts:", posts);
 

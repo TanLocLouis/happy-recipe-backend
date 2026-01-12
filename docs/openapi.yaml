@@ -344,6 +344,12 @@ paths:
     get:
       tags: [Posts]
       summary: Latest posts
+      description: |
+        Returns the latest posts. When `details=true`, includes ingredients, steps, reactions, and user actions.
+        User actions (bookmark status, reaction type) are only populated if the request includes a valid authentication token.
+      security:
+        - bearerAuth: []
+        - {}
       parameters:
         - in: query
           name: limit
@@ -359,7 +365,7 @@ paths:
           name: details
           schema:
             type: boolean
-            description: When true, include ingredients and steps
+            description: When true, include ingredients, steps, reactions, and userActions
       responses:
         '200':
           description: Latest posts
@@ -371,7 +377,7 @@ paths:
                   posts:
                     type: array
                     items:
-                      $ref: '#/components/schemas/PostDetail'
+                      $ref: '#/components/schemas/PostDetailWithActions'
 
   /api/posts/{id}:
     get:
@@ -2036,6 +2042,34 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/StepInput'
+
+    PostDetailWithActions:
+      allOf:
+        - $ref: '#/components/schemas/PostDetail'
+        - type: object
+          properties:
+            reactions:
+              type: object
+              description: Per-type reaction counts
+              properties:
+                like:
+                  type: integer
+                heart:
+                  type: integer
+                yum:
+                  type: integer
+            userActions:
+              type: object
+              description: Viewer-specific actions (requires authentication)
+              properties:
+                userBookmark:
+                  type: boolean
+                  description: Whether the user has bookmarked this post
+                userReaction:
+                  type: string
+                  nullable: true
+                  enum: [like, heart, yum, null]
+                  description: User's reaction type or null if no reaction
 
     PostWithActions:
       allOf:
