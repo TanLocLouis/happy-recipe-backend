@@ -842,6 +842,7 @@ export async function getRelatedPosts(req, res) {
   const offset = (page - 1) * limit;
 
   const { id } = req.params; // postId
+  console.log("[DEBUG] Target post ID:", id);
 
   try {
     const rows = await prisma.posts.findMany({
@@ -870,7 +871,7 @@ export async function getRelatedPosts(req, res) {
       skip: offset,
     });
 
-    const targetPost = rows.find((p) => p.post_id.slice(0, 8) === id);
+    const targetPost = rows.find((p) => p.post_id.slice(0, 8) === id.slice(0, 8));
     const targetPostEmbedding =
       targetPost && targetPost.embedded_content ? JSON.parse(targetPost.embedded_content) : null;
 
