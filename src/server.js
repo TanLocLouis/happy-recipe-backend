@@ -12,10 +12,10 @@ import searchRoutes from "./routes/search.js";
 import usersRoute from "./routes/users.js";
 import aiRoutes from "./routes/ai.js";
 import { testConnection } from "./config/db.js";
+import rateLimit from "express-rate-limit";
 
 const app = express();
 
-// app.use(helmet());
 app.use(
   helmet({
     crossOriginResourcePolicy: {
@@ -31,6 +31,16 @@ app.use(
 );
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
+
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // limit each IP to 1000 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many requests, please try again later.",
+});
+app.use(limiter);
 
 app.get("/health", async (req, res) => {
   try {
