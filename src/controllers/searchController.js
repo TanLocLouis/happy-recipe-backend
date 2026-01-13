@@ -1,4 +1,5 @@
 import prisma from "../config/prisma.js";
+import { extractFeatures, cosineSimilarity } from "../utils/embedVector.js";
 
 export async function searchPosts(req, res) {
   console.log("[DEBUG] searchPosts called");
@@ -7,7 +8,6 @@ export async function searchPosts(req, res) {
     const searchQuery = req.query.query?.trim() || "";
     const page = parseInt(req.query.page) || 1;
     const pageSize = 20; // Results per page
-    const skip = (page - 1) * pageSize;
 
     console.log("[DEBUG] category:", category, "searchQuery:", searchQuery, "page:", page);
     const viewerUserId = req.userId || null;
@@ -22,6 +22,7 @@ export async function searchPosts(req, res) {
 
     // Handle user search
     if (category === "user") {
+      const skip = (page - 1) * pageSize;
       const users = await prisma.users.findMany({
         where: {
           is_active: true,
@@ -64,7 +65,13 @@ export async function searchPosts(req, res) {
       });
     }
 
-    // Search posts by title (case-insensitive)
+    // Generate embedding for the search query
+    const queryEmbedding = await extractFeatures(searchQuery);
+    if (!queryEmbedding) {
+      return res.status(500).json({ message: "Failed to generate search embedding" });
+    }
+
+    // Fetch all non-deleted posts with embedded_content for semantic search
     const postSelect = {
       post_id: true,
       user_id: true,
@@ -74,6 +81,7 @@ export async function searchPosts(req, res) {
       difficulty: true,
       cover_image_url: true,
       created_at: true,
+      embedded_content: true,
       users: { select: { user_id: true, username: true, display_name: true } },
     };
 
@@ -90,18 +98,29 @@ export async function searchPosts(req, res) {
       };
     }
 
-    const posts = await prisma.posts.findMany({
+    const allPosts = await prisma.posts.findMany({
       where: {
         is_deleted: false,
-        title: {
-          contains: searchQuery,
-        },
       },
       select: postSelect,
-      skip,
-      take: pageSize,
       orderBy: { created_at: "desc" },
     });
+
+    // Compute similarity scores for posts with embeddings
+    const postsWithSimilarity = allPosts
+      .filter((p) => p.embedded_content)
+      .map((p) => {
+        const postEmbedding = JSON.parse(p.embedded_content);
+        const similarity = cosineSimilarity(queryEmbedding, postEmbedding);
+        return { post: p, similarity };
+      })
+      .filter((ps) => ps.similarity > 0.3) // Filter out low similarity results
+      .sort((a, b) => b.similarity - a.similarity);
+
+    // Apply pagination after sorting by similarity
+    const skip = (page - 1) * pageSize;
+    const paginatedPosts = postsWithSimilarity.slice(skip, skip + pageSize);
+    const posts = paginatedPosts.map((ps) => ps.post);
 
     const postIds = posts.map((p) => p.post_id);
 
@@ -155,7 +174,8 @@ export async function searchPosts(req, res) {
       pagination: {
         page,
         pageSize,
-        hasMore: data.length === pageSize,
+        total: postsWithSimilarity.length,
+        hasMore: skip + pageSize < postsWithSimilarity.length,
       },
     });
   } catch (err) {
