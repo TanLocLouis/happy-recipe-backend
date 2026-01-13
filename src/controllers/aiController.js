@@ -2,6 +2,7 @@ import { model } from "../utils/gemini.js";
 import { openai, SYSTEM_PROMPT } from "../utils/openai.js";
 
 export async function chatAI(req, res) {
+  console.log("[DEBUG] Gemini called:", req.body);
   try {
     const { chatList } = req.body || {};
 
@@ -59,6 +60,7 @@ export async function chatAI(req, res) {
 }
 
 export async function chatOpenAI(req, res) {
+  console.log("[DEBUG] chatOpenAI called");
   try {
     const { chatList } = req.body || {};
 
@@ -77,16 +79,19 @@ export async function chatOpenAI(req, res) {
 
     // Build messages for OpenAI: include system prompt, then history
     const messages = [
+      { role: "system", content: SYSTEM_PROMPT },
       ...recent.map((m) => ({
         role: m.role,
         content: String(m.content || ""),
       })),
     ];
 
+    console.log("[DEBUG] OpenAI chat messages:", messages);
+
     // Check that messages length does not exceed model limits (e.g., 4096 tokens)
     // This is a simplified check; in production, consider using a tokenizer to count tokens accurately
     const totalLength = messages.reduce((acc, msg) => acc + msg.content.length, 0);
-    if (totalLength > 1000) {
+    if (totalLength > 10000) {
       // Approximate limit for gpt-4o-mini
       return res.status(400).json({ error: "Chat history exceeds maximum allowed length" });
     }
@@ -94,18 +99,21 @@ export async function chatOpenAI(req, res) {
     // Call OpenAI with chat history
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      instructions: SYSTEM_PROMPT,
-      input: messages,
+      messages: messages,
       temperature: 0.3,
       response_format: {
         type: "json_schema",
-        schema: {
-          type: "object",
-          properties: {
-            reply: { type: "string", description: "Information about the recipe" },
-            redirect: { type: "string", description: "Title of the recipe" },
+        json_schema: {
+          name: "recipe_response",
+          schema: {
+            type: "object",
+            properties: {
+              reply: { type: "string", description: "Information about the recipe" },
+              redirect: { type: "string", description: "Title of the recipe" },
+            },
+            required: ["reply", "redirect"],
+            additionalProperties: false,
           },
-          required: ["reply", "redirect"],
         },
       },
     });
