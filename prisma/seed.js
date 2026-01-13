@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import prisma from '../src/config/prisma.js';
 import { hashPassword } from '../src/utils/password.js';
-import { profile } from 'console';
+import { extractFeatures } from '../src/utils/embedVector.js';
 
 // Compatibility: if client hasn't been generated with `bookmarks` yet,
 // fall back to `favorites` to avoid runtime errors during seeding.
@@ -20,16 +20,34 @@ async function main() {
 
   await prisma.$connect();
 
+  const bios = [
+    'Passionate home cook who loves experimenting with flavors.',
+    'Food blogger sharing easy weeknight recipes.',
+    'Professional chef with 10 years of experience.',
+    'Healthy eating enthusiast and nutrition lover.',
+    'Baking addict who can\'t resist a good dessert.',
+    'Vegetarian cook exploring plant-based cuisine.',
+    'BBQ master and grill expert.',
+    'Asian cuisine specialist with a love for spices.',
+    'Mom of 3 sharing family-friendly recipes.',
+    'Culinary student learning the art of cooking.',
+    'Food photographer and recipe developer.',
+    'Weekend chef who loves hosting dinner parties.',
+    'Comfort food lover with a twist.',
+    'Fusion cuisine explorer mixing cultures.',
+    'Farm-to-table advocate supporting local produce.'
+  ];
+
   // Base users (kept deterministic-ish) + generate extras
   const baseUsers = [
-    { username: 'alice', email: '23120057@student.hcmus.edu.vn', display_name: 'Alice', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg', role: 'ADMIN' },
-    { username: 'bob', email: 'bob@example.com', display_name: 'Bob', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg', role: 'MODERATOR' },
-    { username: 'carol', email: 'carol@example.com', display_name: 'Carol', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg', role: 'USER' }
+    { username: 'alice', email: '23120057@student.hcmus.edu.vn', display_name: 'Alice', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg', role: 'ADMIN', bio: pick(bios) },
+    { username: 'bob', email: 'bob@example.com', display_name: 'Bob', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg', role: 'MODERATOR', bio: pick(bios) },
+    { username: 'carol', email: 'carol@example.com', display_name: 'Carol', password: 'password123', profile_image_url: '/api/posts/files/sample.jpg', role: 'USER', bio: pick(bios) }
   ];
 
   const extraCount = 12; // generate 12 additional users for richer data
   for (let i = 1; i <= extraCount; i++) {
-    baseUsers.push({ username: `user${i}`, email: `user${i}@example.com`, display_name: `User ${i}`, password: 'password123' });
+    baseUsers.push({ username: `user${i}`, email: `user${i}@example.com`, display_name: `User ${i}`, password: 'password123', bio: pick(bios) });
   }
 
   const users = [];
@@ -41,7 +59,8 @@ async function main() {
       update: {
         username: u.username,
         display_name: u.display_name,
-        password_hash: pwHash
+        password_hash: pwHash,
+        bio: u.bio || null
       },
       create: {
         user_id: id,
@@ -49,7 +68,8 @@ async function main() {
         email: u.email,
         password_hash: pwHash,
         profile_image_url: u.profile_image_url || null,
-        display_name: u.display_name
+        display_name: u.display_name,
+        bio: u.bio || null
       }
     });
     users.push(up);
@@ -88,6 +108,11 @@ async function main() {
       const difficulty = pick(['easy', 'medium', 'hard']);
       const postId = randomUUID();
 
+      // Generate embedding for title + description
+      console.log(`Generating embedding for post: ${title}`);
+      const embeddingVector = await extractFeatures(title + ' ' + description);
+      const embedded_content = embeddingVector ? JSON.stringify(embeddingVector) : null;
+
       // ingredients
       const ingCount = randInt(2, 6);
       const ingredients = [];
@@ -113,6 +138,7 @@ async function main() {
           servings,
           difficulty,
           cover_image_url: pick(sampleImages),
+          embedded_content,
           ingredients: { create: ingredients },
           steps: { create: steps }
         }
