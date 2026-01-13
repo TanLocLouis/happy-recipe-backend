@@ -86,7 +86,7 @@ router.get(
 
 router.get(
   "/:id",
-  // optionalAuthenticate, // Optional authentication for user-specific actions
+  optionalAuthenticate, // Optional authentication for user-specific actions
   [param("id").isString().isLength({ min: 1, max: 36 })],
   validateRequest,
   getPostByID

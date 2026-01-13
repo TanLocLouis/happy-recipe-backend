@@ -6,13 +6,13 @@ import { verifyToken } from "../utils/jwt.js";
  * Returns 401 if token is missing or invalid
  */
 export function authenticate(req, res, next) {
-  console.log('[DEBUG] authenticate middleware called');
+  console.log("[DEBUG] authenticate middleware called");
   // console.log("Headers:", req.headers);
   try {
-    const authHeader = req.headers['authorization'];
+    const authHeader = req.headers["authorization"];
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Missing or invalid authorization header' });
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Missing or invalid authorization header" });
     }
 
     const token = authHeader.split(" ")[1];
