@@ -82,7 +82,9 @@ export async function searchPosts(req, res) {
       cover_image_url: true,
       created_at: true,
       embedded_content: true,
-      users: { select: { user_id: true, username: true, display_name: true } },
+      users: {
+        select: { user_id: true, username: true, display_name: true, profile_image_url: true },
+      },
     };
 
     if (viewerUserId) {
@@ -158,6 +160,10 @@ export async function searchPosts(req, res) {
         coverImgUrl: process.env.SERVER_URL + p.cover_image_url || null,
         authorID: p.user_id,
         authorName: author ? author.display_name || author.username || null : null,
+        authorImgUrl:
+          author && author.profile_image_url
+            ? process.env.SERVER_URL + author.profile_image_url
+            : null,
         cookTime: p.cook_time ?? null,
         servings: p.servings ?? null,
         difficulty: p.difficulty || null,

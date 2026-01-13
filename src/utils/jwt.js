@@ -1,6 +1,6 @@
-import jwt from 'jsonwebtoken';
+import jwt from "jsonwebtoken";
 
-const { JWT_SECRET = 'dev_secret', JWT_EXPIRES_IN = '7d' } = process.env;
+const { JWT_SECRET = "dev_secret", JWT_EXPIRES_IN = "7d" } = process.env;
 
 // signToken accepts an optional expiresIn override (e.g., '15m' for access tokens)
 export function signToken(payload, expiresInOverride) {
@@ -11,4 +11,3 @@ export function signToken(payload, expiresInOverride) {
 export function verifyToken(token) {
   return jwt.verify(token, JWT_SECRET);
 }
-

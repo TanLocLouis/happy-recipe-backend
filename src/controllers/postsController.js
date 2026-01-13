@@ -312,6 +312,8 @@ export async function getPostByID(req, res) {
       userReaction: null,
     };
 
+    console.log("[DEBUG] userId:", req.userId);
+
     // If userId is available from optional authentication middleware, compute per-user actions
     if (req.userId) {
       const currentUserId = req.userId;
@@ -326,6 +328,9 @@ export async function getPostByID(req, res) {
           select: { reaction_type: true },
         }),
       ]);
+
+      console.log("[DEBUG] getPostByID user bookmark:", bookmarkRow);
+      console.log("[DEBUG] getPostByID user reaction:", userReaction);
       userActions.userBookmark = !!bookmarkRow;
       userActions.userReaction = userReaction ? userReaction.reaction_type : null;
     }
@@ -349,9 +354,12 @@ export async function getPostByID(req, res) {
       steps: Array.isArray(post.steps) ? post.steps.map(mapStep) : [],
     };
 
-    console.log("[DEBUG] getPostByID detailedPost:", detailedPost);
+    const body = {
+      post: detailedPost,
+      tokenState: req.tokenState || "",
+    };
 
-    return res.status(200).json({ post: detailedPost });
+    return res.status(200).json({ ...body });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Internal server error" });
@@ -415,6 +423,8 @@ export async function discoverPosts(req, res) {
   const page = Math.max(parseInt(pageParamRaw || "1", 10), 1);
   const limit = Math.min(parseInt(req.query.limit || "20", 10), 100);
   const offset = (page - 1) * limit;
+
+  console.log("[DEBUG] discoverPosts called with page:", page, "limit:", limit, "offset:", offset);
   try {
     // optional current user id from authentication middleware
     const currentUserId = req.userId || null;
@@ -433,12 +443,13 @@ export async function discoverPosts(req, res) {
           select: { user_id: true, username: true, display_name: true, profile_image_url: true },
         },
       },
-      orderBy: { created_at: "desc" },
+      orderBy: [{ created_at: "desc" }, { post_id: "desc" }],
       take: limit,
       skip: offset,
     });
 
     const postIds = rows.map((r) => r.post_id);
+    console.log("[DEBUG] discoverPosts fetched postIds:", postIds);
 
     // fetch reactions for these posts
     const reactionsRows =
