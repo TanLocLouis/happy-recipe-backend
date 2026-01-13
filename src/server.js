@@ -32,7 +32,6 @@ app.use(
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
-
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 1000, // limit each IP to 1000 requests per windowMs
