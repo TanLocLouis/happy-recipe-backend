@@ -1,18 +1,8 @@
 
 # Happy Food Backend
 
-> Express + Prisma + MySQL REST API for the Happy Food recipe sharing platform.
-
----
-
-## Prerequisites
-
-| Requirement | Version |
-|-------------|---------|
-| Node.js     | 18+     |
-| MySQL       | 8+      |
-
----
+- This is backend for happy-recipe project.
+- Use `Express` + `Prisma` + `MySQL` REST API.
 
 ## Quick Start
 
@@ -74,54 +64,4 @@ npx prisma db seed
 npm run dev
 ```
 
----
-
-## Data & Prisma
-
-| Item | Description |
-|------|-------------|
-| Schema | `prisma/schema.prisma` |
-| User ID | UUID string (`CHAR(36)`) |
-| BigInt | Patched in `server.js` to serialize as strings |
-
----
-
-## Database Files
-
-| File | Purpose |
-|------|---------|
-| `database/happy_recipe.sql` | SQL schema (used by `npm run db:init`) |
-| `prisma/seed.js` | Seed script (via `npx prisma db seed`) |
-| `prisma/reset.js` | Reset/clear all data |
-
----
-
-## API Documentation
-
-| Format | Location |
-|--------|----------|
-| OpenAPI | [`docs/openapi.yaml`](docs/openapi.yaml) → [Swagger Editor](https://editor.swagger.io/) |
-| Postman | [`docs/postman_collection.json`](docs/postman_collection.json) |
-
----
-
-## Project Structure
-
-```
-├── prisma/
-│   ├── schema.prisma    # Database schema
-│   ├── seed.js          # Seed data script
-│   └── reset.js         # Reset database script
-├── src/
-│   ├── config/          # DB & Prisma config
-│   ├── controllers/     # Route handlers
-│   ├── middleware/      # Auth, validation, uploads
-│   ├── routes/          # API route definitions
-│   ├── services/        # Email & external services
-│   ├── utils/           # JWT, password, AI helpers
-│   └── server.js        # Express app entry
-├── docs/                # API documentation
-├── database/            # SQL scripts
-└── uploads/             # User uploaded files
-```
 
