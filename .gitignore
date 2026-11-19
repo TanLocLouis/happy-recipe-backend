@@ -3,3 +3,8 @@
 
 /src/generated/prisma
 /uploads
+
+.env
+env
+/env
+env/
